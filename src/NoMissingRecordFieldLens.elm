@@ -396,8 +396,7 @@ This is equivalent to
         { access, set } =
             functionsForField fieldName
     in
-    CodeGen.record
-        [ ( "get", access ), ( "set", set ) ]
+    record [ ( "get", access ), ( "set", set ) ]
 
 -}
 getSetRecordForField : String -> CodeGen.Expression
