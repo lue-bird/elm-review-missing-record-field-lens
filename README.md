@@ -24,14 +24,15 @@ which is ... suboptimal.
 Using lenses:
 ```elm
 import Field
-import Accessors.Library as Accessors
+import Accessors exposing (over)
+import Accessors.Library exposing (onEach)
 
 InputAdded path newInput ->
     model
         |> over
             ((Field.projects << ZipList.selected)
                 << Field.calls
-                << Accessors.onEach
+                << onEach
             )
             (Tree.updateAt path
                 (Tree.prependChild newInput)
