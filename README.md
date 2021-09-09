@@ -52,7 +52,7 @@ In this example: `Field.projects` and `Field.calls` will automatically be genera
 - [arturopala's elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
 - [zh5's zipper](https://package.elm-lang.org/packages/z5h/zipper/latest/)
 
-Note: It's also possible to generate custom lenses or to customize existing ones.
+Note: It's also possible to generate custom lenses or to customize the generation of existing ones.
 
 ## configuration
 
