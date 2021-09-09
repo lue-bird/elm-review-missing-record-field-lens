@@ -3,7 +3,7 @@
     "name": "lue-bird/elm-review-missing-record-field-lens",
     "summary": "elm-review rule: generate record field lenses that don't exist yet",
     "license": "MIT",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "exposed-modules": [
         "NoMissingRecordFieldLens"
     ],
