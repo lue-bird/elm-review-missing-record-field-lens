@@ -488,17 +488,11 @@ withDocumentation docComment generatedFieldLens =
     }
 
 
-{-| The provided [`FieldLensGenerator`](#FieldLensGenerator)s in this package have no documentation comment.
+{-| Use a different name for the generated lens.
 
-Nothing is holding you back from generating your own documentation, though:
-
-    accessorsWithDocumentation { fieldName } =
+    accessorsWithFieldSuffix { fieldName } =
         accessors { fieldName = fieldName }
-            |> withDocumentation
-                (emptyDocComment
-                    |> markdown
-                        ("Accessor for the field `." ++ fieldName ++ "`.")
-                )
+            |> withName (fieldName ++ "Field")
 
 -}
 withName :
