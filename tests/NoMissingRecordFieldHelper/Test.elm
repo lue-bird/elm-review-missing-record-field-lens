@@ -1,8 +1,9 @@
 module NoMissingRecordFieldHelper.Test exposing (all)
 
 import Expect
-import NoMissingRecordFieldHelper exposing (accessors, fields, monocle, rule, zipper)
-import NoMissingRecordFieldHelper.Internal exposing (nonExistentFieldHelperNameInfo, printFieldHelperDeclaration)
+import NoMissingRecordFieldHelper exposing (rule)
+import NoMissingRecordFieldHelper.Internal exposing (nonExistentFieldHelperNameInfo)
+import RecordFieldHelper exposing (accessors, fields, monocle, printDeclaration, set, update, zipper)
 import Review.Test
 import Test exposing (Test, describe, test)
 
@@ -33,7 +34,7 @@ scoreAPoint =
                 ]
                     |> Review.Test.runOnModules
                         (rule
-                            { generator = accessors
+                            { generators = [ accessors ]
                             , generateIn = ( "Accessors", [ "Library", "Fields" ] )
                             }
                         )
@@ -78,7 +79,7 @@ scoreAPoint =
                 ]
                     |> Review.Test.runOnModules
                         (rule
-                            { generator = accessors
+                            { generators = [ accessors ]
                             , generateIn = ( "Accessors", [ "Library", "Fields" ] )
                             }
                         )
@@ -123,7 +124,7 @@ scoreAPoint =
                 ]
                     |> Review.Test.runOnModules
                         (rule
-                            { generator = accessors
+                            { generators = [ accessors ]
                             , generateIn = ( "Accessors", [ "Library", "Fields" ] )
                             }
                         )
@@ -172,7 +173,7 @@ scoreAPoint =
                 ]
                     |> Review.Test.runOnModules
                         (rule
-                            { generator = accessors
+                            { generators = [ accessors ]
                             , generateIn = ( "Accessors", [ "Library", "Fields" ] )
                             }
                         )
@@ -212,8 +213,8 @@ declarations =
     describe "kinds of declarations"
         [ test "elm-accessors"
             (\() ->
-                accessors.declaration
-                    |> printFieldHelperDeclaration { fieldName = "score" }
+                accessors.declaration { fieldName = "score" }
+                    |> RecordFieldHelper.printDeclaration
                     |> Expect.equal
                         """score : Relation score sub wrap -> Relation { record | score : score } sub wrap
 score =
@@ -221,8 +222,8 @@ score =
             )
         , test "elm-monocle"
             (\() ->
-                monocle.declaration
-                    |> printFieldHelperDeclaration { fieldName = "score" }
+                monocle.declaration { fieldName = "score" }
+                    |> RecordFieldHelper.printDeclaration
                     |> Expect.equal
                         """score : Lens { record | score : score } score
 score =
@@ -230,8 +231,8 @@ score =
             )
         , test "elm-fields"
             (\() ->
-                fields.declaration
-                    |> printFieldHelperDeclaration { fieldName = "score" }
+                fields.declaration { fieldName = "score" }
+                    |> RecordFieldHelper.printDeclaration
                     |> Expect.equal
                         """score :
     { get : { a | score : score } -> score
@@ -242,12 +243,30 @@ score =
             )
         , test "zipper"
             (\() ->
-                zipper.declaration
-                    |> printFieldHelperDeclaration { fieldName = "score" }
+                zipper.declaration { fieldName = "score" }
+                    |> RecordFieldHelper.printDeclaration
                     |> Expect.equal
                         """intoScore : Zipper { record | score : score } root -> Zipper score root
 intoScore =
     into .score (\\score_ r -> { r | score = score_ })"""
+            )
+        , test "set"
+            (\() ->
+                set.declaration { fieldName = "score" }
+                    |> RecordFieldHelper.printDeclaration
+                    |> Expect.equal
+                        """setScore : score -> { record | score : score } -> { record | score : score }
+setScore score_ record =
+    { record | score = score_ }"""
+            )
+        , test "update"
+            (\() ->
+                update.declaration { fieldName = "score" }
+                    |> RecordFieldHelper.printDeclaration
+                    |> Expect.equal
+                        """updateScore : (score -> score) -> { record | score : score } -> { record | score : score }
+updateScore f record =
+    { record | score = f record.score }"""
             )
         ]
 
@@ -271,7 +290,7 @@ scoreAPoint =
             ]
                 |> Review.Test.runOnModules
                     (rule
-                        { generator = accessors
+                        { generators = [ accessors ]
                         , generateIn = ( "Accessors", [ "Library", "Fields" ] )
                         }
                     )
