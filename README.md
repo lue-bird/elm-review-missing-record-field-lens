@@ -69,11 +69,11 @@ The biggest pain-point with these helpers is the need to manually create one for
 
 #### helpers that work out of the box:
 
+- `updateField`, `setField`
 - [bChiquet's elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
 - [sjorn3's elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
 - [arturopala's elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
 - [zh5's zipper](https://package.elm-lang.org/packages/z5h/zipper/latest/)
-- `updateField`, `setField`, `atField`
 
 Note: It's also possible to generate custom lenses or to customize the generation of existing ones.
 
