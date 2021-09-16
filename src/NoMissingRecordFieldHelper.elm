@@ -1,4 +1,4 @@
-module NoMissingRecordFieldLens exposing
+module NoMissingRecordFieldHelper exposing
     ( rule, Config
     , accessors, monocle, fields, zipper
     , FieldLensGenerator, FieldLensDeclaration, functionsForField, getSetRecordForField, withDocumentation, withName
@@ -24,7 +24,7 @@ module NoMissingRecordFieldLens exposing
 -}
 
 import Elm.CodeGen as CodeGen
-import NoMissingRecordFieldLens.Internal as Internal
+import NoMissingRecordFieldHelper.Internal as Internal
 import Review.Rule exposing (Rule)
 
 
@@ -39,8 +39,8 @@ Examples of such lenses are
 
 ```
 config =
-    [ NoMissingRecordFieldLens.rule
-        { generate = NoMissingRecordFieldLens.accessors
+    [ NoMissingRecordFieldHelper.rule
+        { generate = NoMissingRecordFieldHelper.accessors
         , generateIn = ( "Accessors", [ "Library", "Fields" ] )
         }
     ]

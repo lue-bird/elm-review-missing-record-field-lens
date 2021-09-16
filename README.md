@@ -52,6 +52,7 @@ In this example: `Field.projects` and `Field.calls` will automatically be genera
 - [sjorn3's elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
 - [arturopala's elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
 - [zh5's zipper](https://package.elm-lang.org/packages/z5h/zipper/latest/)
+- `updateField`, `setField`, `atField`
 
 Note: It's also possible to generate custom lenses or to customize the generation of existing ones.
 
@@ -60,19 +61,20 @@ Note: It's also possible to generate custom lenses or to customize the generatio
 ```elm
 module ReviewConfig exposing (config)
 
-import NoMissingRecordFieldLens
+import NoMissingRecordFieldHelper
 import Review.Rule exposing (Rule)
 
 config : List Rule
 config =
-    [ NoMissingRecordFieldLens.rule
-        { generate = NoMissingRecordFieldLens.accessors
-        , generateIn =
-            ( "Accessors", [ "Library", "RecordFields" ] )
-        }
+    [ NoMissingRecordFieldHelper.rule
+        [ { generate = [ NoMissingRecordFieldHelper.accessors ]
+          , generateIn =
+              ( "Accessors", [ "Library", "RecordFields" ] )
+          }
+        ]
     ]
 ```
-See [`Config`](NoMissingRecordFieldLens#Config)
+See [`Config`](NoMissingRecordFieldHelper#Config)
 
 ## suggestions?
 → [contributing](https://github.com/lue-bird/elm-review-missing-record-field-lens/blob/master/contributing.md).
