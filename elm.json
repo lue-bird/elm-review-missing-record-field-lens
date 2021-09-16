@@ -1,11 +1,12 @@
 {
     "type": "package",
     "name": "lue-bird/elm-review-missing-record-field-lens",
-    "summary": "elm-review rule: generate record field lenses that don't exist yet",
+    "summary": "elm-review rule: generate record field helpers that don't exist yet",
     "license": "MIT",
     "version": "1.0.2",
     "exposed-modules": [
-        "NoMissingRecordFieldHelper"
+        "NoMissingRecordFieldHelper",
+        "RecordFieldHelper"
     ],
     "elm-version": "0.19.0 <= v < 0.20.0",
     "dependencies": {
