@@ -1,4 +1,4 @@
-module NoMissingRecordFieldHelper.Internal exposing (nonExistentFieldLensNameInfo, printFieldLensDeclaration, rule)
+module NoMissingRecordFieldHelper.Internal exposing (nonExistentFieldHelperNameInfo, printFieldHelperDeclaration, rule)
 
 import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
@@ -19,7 +19,7 @@ import Review.Rule as Rule exposing (ContextCreator, ModuleKey, Rule)
 rule : Config -> Rule
 rule { generator, generateIn } =
     let
-        fieldLensesModule =
+        fieldHelperesModule =
             let
                 ( head, tail ) =
                     generateIn
@@ -34,16 +34,16 @@ rule { generator, generateIn } =
                         moduleName =
                             Rule.moduleNameFromMetadata metadata
                     in
-                    if moduleName == fieldLensesModule then
-                        FieldLensesModule
+                    if moduleName == fieldHelperesModule then
+                        FieldHelperesModule
                             { content = Dict.empty
                             , beforeDeclarations = { row = 1, column = 1 }
                             , exposing_ = Node Range.emptyRange (Exposing.Explicit [])
                             }
 
                     else
-                        NotFieldLensesModule
-                            { usedFieldLenses = Dict.empty
+                        NotFieldHelperesModule
+                            { usedFieldHelperes = Dict.empty
                             , moduleNameLookupTable = moduleNameLookupTable
                             }
                 )
@@ -59,9 +59,9 @@ rule { generator, generateIn } =
                             Rule.moduleNameNodeFromMetadata metadata
                     in
                     case moduleContext of
-                        FieldLensesModule { content, beforeDeclarations, exposing_ } ->
-                            { modulesThatUseFieldLenses = []
-                            , fieldLensesModuleInfo =
+                        FieldHelperesModule { content, beforeDeclarations, exposing_ } ->
+                            { modulesThatUseFieldHelperes = []
+                            , fieldHelperesModuleInfo =
                                 Just
                                     { key = moduleKey
                                     , moduleNameRange = moduleNameRange
@@ -71,13 +71,13 @@ rule { generator, generateIn } =
                                     }
                             }
 
-                        NotFieldLensesModule { usedFieldLenses } ->
-                            { modulesThatUseFieldLenses =
+                        NotFieldHelperesModule { usedFieldHelperes } ->
+                            { modulesThatUseFieldHelperes =
                                 [ { key = moduleKey
-                                  , usedFieldLenses = usedFieldLenses
+                                  , usedFieldHelperes = usedFieldHelperes
                                   }
                                 ]
-                            , fieldLensesModuleInfo = Nothing
+                            , fieldHelperesModuleInfo = Nothing
                             }
                 )
                 |> Rule.withMetadata
@@ -85,46 +85,46 @@ rule { generator, generateIn } =
 
         foldProjectContexts : ProjectContext -> ProjectContext -> ProjectContext
         foldProjectContexts aContext bContext =
-            { modulesThatUseFieldLenses =
-                [ aContext.modulesThatUseFieldLenses
-                , bContext.modulesThatUseFieldLenses
+            { modulesThatUseFieldHelperes =
+                [ aContext.modulesThatUseFieldHelperes
+                , bContext.modulesThatUseFieldHelperes
                 ]
                     |> List.concat
-            , fieldLensesModuleInfo =
+            , fieldHelperesModuleInfo =
                 [ aContext, bContext ]
-                    |> List.map .fieldLensesModuleInfo
+                    |> List.map .fieldHelperesModuleInfo
                     |> firstJust
             }
 
         initialProjectContext : ProjectContext
         initialProjectContext =
-            { modulesThatUseFieldLenses = []
-            , fieldLensesModuleInfo = Nothing
+            { modulesThatUseFieldHelperes = []
+            , fieldHelperesModuleInfo = Nothing
             }
 
         finalEvaluation : ProjectContext -> List (Rule.Error e_)
-        finalEvaluation { modulesThatUseFieldLenses, fieldLensesModuleInfo } =
-            modulesThatUseFieldLenses
+        finalEvaluation { modulesThatUseFieldHelperes, fieldHelperesModuleInfo } =
+            modulesThatUseFieldHelperes
                 |> List.concatMap
-                    (\moduleThatUseFieldLenses ->
-                        case fieldLensesModuleInfo of
-                            Just fieldLensesModule_ ->
-                                Dict.diff moduleThatUseFieldLenses.usedFieldLenses
-                                    fieldLensesModule_.content
+                    (\moduleThatUseFieldHelperes ->
+                        case fieldHelperesModuleInfo of
+                            Just fieldHelperesModule_ ->
+                                Dict.diff moduleThatUseFieldHelperes.usedFieldHelperes
+                                    fieldHelperesModule_.content
                                     |> Dict.keys
                                     |> List.map
-                                        (\nonExistentFieldLensName ->
+                                        (\nonExistentFieldHelperName ->
                                             Rule.errorForModuleWithFix
-                                                fieldLensesModule_.key
-                                                (nonExistentFieldLensNameInfo nonExistentFieldLensName)
-                                                fieldLensesModule_.moduleNameRange
+                                                fieldHelperesModule_.key
+                                                (nonExistentFieldHelperNameInfo nonExistentFieldHelperName)
+                                                fieldHelperesModule_.moduleNameRange
                                                 (let
                                                     insertLocationInDeclarations =
-                                                        fieldLensesModule_.content
+                                                        fieldHelperesModule_.content
                                                             |> Dict.toList
                                                             |> List.dropWhileRight
                                                                 (\( existing, _ ) ->
-                                                                    existing > nonExistentFieldLensName
+                                                                    existing > nonExistentFieldHelperName
                                                                 )
                                                             |> List.head
                                                  in
@@ -134,33 +134,38 @@ rule { generator, generateIn } =
                                                                 range.end
 
                                                             Nothing ->
-                                                                fieldLensesModule_.beforeDeclarations
+                                                                fieldHelperesModule_.beforeDeclarations
                                                         )
-                                                        ([ "\n\n\n"
-                                                         , printFieldLensDeclaration
-                                                            { fieldName = nonExistentFieldLensName }
-                                                            generator.declaration
-                                                         ]
+                                                        (generator
+                                                            |> List.concatMap
+                                                                (\{ declaration } ->
+                                                                    [ "\n\n\n"
+                                                                    , printFieldHelperDeclaration
+                                                                        { fieldName = nonExistentFieldHelperName }
+                                                                        declaration
+                                                                    ]
+                                                                )
                                                             |> String.concat
                                                         )
                                                    , Fix.insertAt
-                                                        (fieldLensesModule_.exposing_
+                                                        (fieldHelperesModule_.exposing_
                                                             |> Node.range
                                                             |> .end
                                                         )
                                                         ([ "\n\n"
-                                                         , generator.imports
+                                                         , generator
+                                                            |> List.concatMap .imports
                                                             |> CodeGen.prettyImports
                                                             |> pretty 1000
                                                          ]
                                                             |> String.concat
                                                         )
                                                    ]
-                                                 , case fieldLensesModule_.exposing_ of
+                                                 , case fieldHelperesModule_.exposing_ of
                                                     Node { end } (Exposing.Explicit _) ->
                                                         [ Fix.insertAt
                                                             { row = end.row, column = end.column - 1 }
-                                                            (", " ++ nonExistentFieldLensName)
+                                                            (", " ++ nonExistentFieldHelperName)
                                                         ]
 
                                                     _ ->
@@ -172,13 +177,13 @@ rule { generator, generateIn } =
 
                             Nothing ->
                                 case
-                                    moduleThatUseFieldLenses.usedFieldLenses
+                                    moduleThatUseFieldHelperes.usedFieldHelperes
                                         |> Dict.values
                                 of
                                     firstRange :: _ ->
                                         [ Rule.errorForModule
-                                            moduleThatUseFieldLenses.key
-                                            (fieldLensesModuleDoesntExistInfo fieldLensesModule)
+                                            moduleThatUseFieldHelperes.key
+                                            (fieldHelperesModuleDoesntExistInfo fieldHelperesModule)
                                             firstRange
                                         ]
 
@@ -193,19 +198,19 @@ rule { generator, generateIn } =
                 (\(Node moduleDefinitionRange moduleDefinition) moduleContext ->
                     ( []
                     , case moduleContext of
-                        FieldLensesModule fieldLensesModuleContext ->
+                        FieldHelperesModule fieldHelperesModuleContext ->
                             case moduleDefinition of
                                 NormalModule { exposingList } ->
-                                    { fieldLensesModuleContext
+                                    { fieldHelperesModuleContext
                                         | exposing_ = exposingList
                                         , beforeDeclarations = moduleDefinitionRange.end
                                     }
-                                        |> FieldLensesModule
+                                        |> FieldHelperesModule
 
                                 _ ->
                                     moduleContext
 
-                        NotFieldLensesModule _ ->
+                        NotFieldHelperesModule _ ->
                             moduleContext
                     )
                 )
@@ -213,22 +218,22 @@ rule { generator, generateIn } =
                     (\comments moduleContext ->
                         ( []
                         , case moduleContext of
-                            FieldLensesModule fieldLensesModuleContext ->
+                            FieldHelperesModule fieldHelperesModuleContext ->
                                 case
                                     comments
                                         |> List.filter
                                             (String.startsWith "{-|" << Node.value)
                                 of
                                     (Node commentRange _) :: _ ->
-                                        { fieldLensesModuleContext
+                                        { fieldHelperesModuleContext
                                             | beforeDeclarations = commentRange.end
                                         }
-                                            |> FieldLensesModule
+                                            |> FieldHelperesModule
 
                                     [] ->
                                         moduleContext
 
-                            NotFieldLensesModule _ ->
+                            NotFieldHelperesModule _ ->
                                 moduleContext
                         )
                     )
@@ -236,21 +241,21 @@ rule { generator, generateIn } =
                     (\(Node { end } _) moduleContext ->
                         ( []
                         , case moduleContext of
-                            FieldLensesModule fieldLensesModuleContext ->
+                            FieldHelperesModule fieldHelperesModuleContext ->
                                 let
                                     before =
-                                        fieldLensesModuleContext.beforeDeclarations
+                                        fieldHelperesModuleContext.beforeDeclarations
                                 in
                                 if end.row > before.row then
-                                    { fieldLensesModuleContext
+                                    { fieldHelperesModuleContext
                                         | beforeDeclarations = end
                                     }
-                                        |> FieldLensesModule
+                                        |> FieldHelperesModule
 
                                 else
                                     moduleContext
 
-                            NotFieldLensesModule _ ->
+                            NotFieldHelperesModule _ ->
                                 moduleContext
                         )
                     )
@@ -258,8 +263,8 @@ rule { generator, generateIn } =
                     (\declarations moduleContext ->
                         ( []
                         , case moduleContext of
-                            FieldLensesModule fieldLensesModuleContext ->
-                                { fieldLensesModuleContext
+                            FieldHelperesModule fieldHelperesModuleContext ->
+                                { fieldHelperesModuleContext
                                     | content =
                                         declarations
                                             |> List.filterMap
@@ -279,9 +284,9 @@ rule { generator, generateIn } =
                                                 )
                                             |> Dict.fromList
                                 }
-                                    |> FieldLensesModule
+                                    |> FieldHelperesModule
 
-                            NotFieldLensesModule _ ->
+                            NotFieldHelperesModule _ ->
                                 moduleContext
                         )
                     )
@@ -289,39 +294,39 @@ rule { generator, generateIn } =
                     (\(Node expressionRange expression) moduleContext ->
                         ( []
                         , case moduleContext of
-                            FieldLensesModule _ ->
+                            FieldHelperesModule _ ->
                                 moduleContext
 
-                            NotFieldLensesModule notFieldLensesModuleContext ->
+                            NotFieldHelperesModule notFieldHelperesModuleContext ->
                                 (case expression of
                                     Expression.FunctionOrValue _ potentialFieldName ->
                                         case
                                             ModuleNameLookupTable.moduleNameAt
-                                                notFieldLensesModuleContext.moduleNameLookupTable
+                                                notFieldHelperesModuleContext.moduleNameLookupTable
                                                 expressionRange
                                         of
                                             Just moduleName ->
-                                                if moduleName == fieldLensesModule then
+                                                if moduleName == fieldHelperesModule then
                                                     let
                                                         fieldName =
                                                             potentialFieldName
                                                     in
-                                                    { notFieldLensesModuleContext
-                                                        | usedFieldLenses =
-                                                            notFieldLensesModuleContext.usedFieldLenses
+                                                    { notFieldHelperesModuleContext
+                                                        | usedFieldHelperes =
+                                                            notFieldHelperesModuleContext.usedFieldHelperes
                                                                 |> Dict.insert fieldName expressionRange
                                                     }
 
                                                 else
-                                                    notFieldLensesModuleContext
+                                                    notFieldHelperesModuleContext
 
                                             Nothing ->
-                                                notFieldLensesModuleContext
+                                                notFieldHelperesModuleContext
 
                                     _ ->
-                                        notFieldLensesModuleContext
+                                        notFieldHelperesModuleContext
                                 )
-                                    |> NotFieldLensesModule
+                                    |> NotFieldHelperesModule
                         )
                     )
             )
@@ -335,12 +340,12 @@ rule { generator, generateIn } =
 
 
 type alias ProjectContext =
-    { modulesThatUseFieldLenses :
+    { modulesThatUseFieldHelperes :
         List
             { key : ModuleKey
-            , usedFieldLenses : Dict String Range
+            , usedFieldHelperes : Dict String Range
             }
-    , fieldLensesModuleInfo :
+    , fieldHelperesModuleInfo :
         Maybe
             { key : ModuleKey
             , moduleNameRange : Range
@@ -352,13 +357,13 @@ type alias ProjectContext =
 
 
 type ModuleContext
-    = FieldLensesModule
+    = FieldHelperesModule
         { content : Dict String Range
         , beforeDeclarations : Location
         , exposing_ : Node Exposing
         }
-    | NotFieldLensesModule
-        { usedFieldLenses : Dict String Range
+    | NotFieldHelperesModule
+        { usedFieldHelperes : Dict String Range
         , moduleNameLookupTable : ModuleNameLookupTable
         }
 
@@ -367,19 +372,19 @@ type ModuleContext
 --
 
 
-nonExistentFieldLensNameInfo : String -> { message : String, details : List String }
-nonExistentFieldLensNameInfo nonExistentFieldLensName =
-    { message = "No lens for the field `." ++ nonExistentFieldLensName ++ "` exists yet"
+nonExistentFieldHelperNameInfo : String -> { message : String, details : List String }
+nonExistentFieldHelperNameInfo nonExistentFieldHelperName =
+    { message = "No lens for the field `." ++ nonExistentFieldHelperName ++ "` exists yet"
     , details = [ "Add the auto-generated lens through the fix." ]
     }
 
 
-fieldLensesModuleDoesntExistInfo : List String -> { message : String, details : List String }
-fieldLensesModuleDoesntExistInfo fieldLensesModule =
+fieldHelperesModuleDoesntExistInfo : List String -> { message : String, details : List String }
+fieldHelperesModuleDoesntExistInfo fieldHelperesModule =
     { message = "No record field lenses module exists yet"
     , details =
         [ [ "Create a module \""
-          , fieldLensesModule |> String.join "."
+          , fieldHelperesModule |> String.join "."
           , ".elm\" that will contain all record field lenses."
           ]
             |> String.concat
@@ -393,24 +398,24 @@ fieldLensesModuleDoesntExistInfo fieldLensesModule =
 
 
 type alias Config =
-    { generator : FieldLensGenerator
+    { generator : List FieldHelperGenerator
     , generateIn : ( String, List String )
     }
 
 
-{-| How to generate a [`FieldLensDeclaration`](NoMissingRecordFieldHelper#FieldLensDeclaration) plus the necessary imports.
+{-| How to generate a [`FieldHelperDeclaration`](NoMissingRecordFieldHelper#FieldHelperDeclaration) plus the necessary imports.
 -}
-type alias FieldLensGenerator =
+type alias FieldHelperGenerator =
     { imports : List CodeGen.Import
     , declaration :
         { fieldName : String }
-        -> FieldLensDeclaration
+        -> FieldHelperDeclaration
     }
 
 
 {-| All the components to build a field lens declaration.
 -}
-type alias FieldLensDeclaration =
+type alias FieldHelperDeclaration =
     { documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
     , name : String
     , annotation : Maybe CodeGen.TypeAnnotation
@@ -420,11 +425,11 @@ type alias FieldLensDeclaration =
 
 {-| Print a lens declaration.
 
-    test "custom FieldLensGenerator"
+    test "custom FieldHelperGenerator"
         (\() ->
-            customFieldLensGenerator.declaration
+            customFieldHelperGenerator.declaration
                 { fieldName = "test" }
-                |> printFieldLensDeclaration
+                |> printFieldHelperDeclaration
                 |> Expect.equal
                     """{-| A lens for the field `.test`.
     -}
@@ -437,11 +442,11 @@ type alias FieldLensDeclaration =
         )
 
 -}
-printFieldLensDeclaration : { fieldName : String } -> ({ fieldName : String } -> FieldLensDeclaration) -> String
-printFieldLensDeclaration { fieldName } fieldLensGenerator =
+printFieldHelperDeclaration : { fieldName : String } -> ({ fieldName : String } -> FieldHelperDeclaration) -> String
+printFieldHelperDeclaration { fieldName } fieldHelperGenerator =
     let
         { documentation, annotation, implementation, name } =
-            fieldLensGenerator { fieldName = fieldName }
+            fieldHelperGenerator { fieldName = fieldName }
     in
     CodeGen.funDecl
         documentation

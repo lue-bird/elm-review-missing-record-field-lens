@@ -1,7 +1,7 @@
 module NoMissingRecordFieldHelper exposing
     ( rule, Config
     , accessors, monocle, fields, zipper
-    , FieldLensGenerator, FieldLensDeclaration, functionsForField, getSetRecordForField, withDocumentation, withName
+    , FieldHelperGenerator, FieldHelperDeclaration, functionsForField, getSetRecordForField, withDocumentation, withName
     )
 
 {-|
@@ -19,7 +19,7 @@ module NoMissingRecordFieldHelper exposing
 
 ## custom
 
-@docs FieldLensGenerator, FieldLensDeclaration, functionsForField, getSetRecordForField, withDocumentation, withName
+@docs FieldHelperGenerator, FieldHelperDeclaration, functionsForField, getSetRecordForField, withDocumentation, withName
 
 -}
 
@@ -28,10 +28,11 @@ import NoMissingRecordFieldHelper.Internal as Internal
 import Review.Rule exposing (Rule)
 
 
-{-| Reports record field lenses that are called in the code but don't exist yet and automatically generates them.
+{-| Automatically generates used record field helpers that don't exist yet.
 
-Examples of such lenses are
+Examples are
 
+  - `updateField`, `setField`
   - [bChiquet's elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
   - [sjorn3's elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
   - [arturopala's elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
@@ -51,7 +52,7 @@ config =
       - [`elm-fields`](#fields),
       - [`elm-monocle`](#monocle),
       - [`zipper`](#zipper) or
-      - [a custom one](#FieldLensGenerator).
+      - [a custom one](#FieldHelperGenerator).
 
   - `generateIn`: The module where all field lenses will be generated in
 
@@ -94,7 +95,8 @@ rule config =
       - [`elm-fields`](#fields),
       - [`elm-monocle`](#monocle),
       - [`zipper`](#zipper) or
-      - [a custom one](#FieldLensGenerator).
+      - [`updateField`](#update), [`setField`](#set)
+      - [a custom one](#FieldHelperGenerator).
 
   - `generateIn`: The module where all field lenses will be generated in
 
@@ -102,12 +104,12 @@ rule config =
 
 -}
 type alias Config =
-    { generator : FieldLensGenerator
+    { generator : List FieldHelperGenerator
     , generateIn : ( String, List String )
     }
 
 
-{-| How to generate a [`FieldLensDeclaration`](#FieldLensDeclaration) plus the necessary imports.
+{-| How to generate a [`FieldHelperDeclaration`](#FieldHelperDeclaration) plus the necessary imports.
 
 Out of the box there are lenses for
 
@@ -118,7 +120,7 @@ Out of the box there are lenses for
 
 You can also create a custom one with the help of [the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest):
 
-    customLens : FieldLensGenerator
+    customLens : FieldHelperGenerator
     customLens  =
         { imports =
             [ importStmt [ "CustomLens" ]
@@ -152,11 +154,11 @@ You can also create a custom one with the help of [the-sett's elm-syntax-dsl](ht
         }
 
 -}
-type alias FieldLensGenerator =
+type alias FieldHelperGenerator =
     { imports : List CodeGen.Import
     , declaration :
         { fieldName : String }
-        -> FieldLensDeclaration
+        -> FieldHelperDeclaration
     }
 
 
@@ -168,7 +170,7 @@ type alias FieldLensGenerator =
     [name] =
         [implementation]
 
-You can customize existing `FieldLensDeclaration`s with [`withDocumentation`](#withDocumentation) and [`withName`](#withName)
+You can customize existing `FieldHelperDeclaration`s with [`withDocumentation`](#withDocumentation) and [`withName`](#withName)
 or create custom lens ([`functionsForField`](#functionsForField) and [`getSetRecordForField`](#getSetRecordForField) can be helpful).
 
     customLensDeclaration { fieldName } =
@@ -194,7 +196,7 @@ or create custom lens ([`functionsForField`](#functionsForField) and [`getSetRec
         }
 
 -}
-type alias FieldLensDeclaration =
+type alias FieldHelperDeclaration =
     { documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
     , name : String
     , annotation : Maybe CodeGen.TypeAnnotation
@@ -211,7 +213,7 @@ type alias FieldLensDeclaration =
         makeOneToOne .score (\f r -> { r | score = f r.score })
 
 -}
-accessors : FieldLensGenerator
+accessors : FieldHelperGenerator
 accessors =
     { imports =
         [ CodeGen.importStmt [ "Accessors" ]
@@ -263,7 +265,7 @@ accessors =
         { get = .score, set = \score_ r -> { r | score = score_ } }
 
 -}
-monocle : FieldLensGenerator
+monocle : FieldHelperGenerator
 monocle =
     { imports =
         [ CodeGen.importStmt [ "Monocle", "Lens" ]
@@ -298,7 +300,7 @@ monocle =
         into .score (\score_ r -> { r | score = score_ })
 
 -}
-zipper : FieldLensGenerator
+zipper : FieldHelperGenerator
 zipper =
     { imports =
         [ CodeGen.importStmt [ "Zipper" ]
@@ -354,7 +356,7 @@ zipper =
         { get = .score, set = \score_ r -> { r | score = score_ } }
 
 -}
-fields : FieldLensGenerator
+fields : FieldHelperGenerator
 fields =
     { imports = []
     , declaration =
@@ -464,7 +466,7 @@ functionsForField fieldName =
     }
 
 
-{-| The provided [`FieldLensGenerator`](#FieldLensGenerator)s in this package have no documentation comment.
+{-| The provided [`FieldHelperGenerator`](#FieldHelperGenerator)s in this package have no documentation comment.
 
 You can generate your own documentation, though:
 
@@ -479,10 +481,10 @@ You can generate your own documentation, though:
 -}
 withDocumentation :
     CodeGen.Comment CodeGen.DocComment
-    -> FieldLensDeclaration
-    -> FieldLensDeclaration
-withDocumentation docComment generatedFieldLens =
-    { generatedFieldLens
+    -> FieldHelperDeclaration
+    -> FieldHelperDeclaration
+withDocumentation docComment generatedFieldHelper =
+    { generatedFieldHelper
         | documentation = docComment |> Just
     }
 
@@ -496,10 +498,10 @@ withDocumentation docComment generatedFieldLens =
 -}
 withName :
     String
-    -> FieldLensDeclaration
-    -> FieldLensDeclaration
-withName name fieldLensDeclaration =
-    { fieldLensDeclaration | name = name }
+    -> FieldHelperDeclaration
+    -> FieldHelperDeclaration
+withName name fieldHelperDeclaration =
+    { fieldHelperDeclaration | name = name }
 
 
 

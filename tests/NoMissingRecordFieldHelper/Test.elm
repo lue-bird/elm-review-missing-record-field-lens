@@ -2,7 +2,7 @@ module NoMissingRecordFieldHelper.Test exposing (all)
 
 import Expect
 import NoMissingRecordFieldHelper exposing (accessors, fields, monocle, rule, zipper)
-import NoMissingRecordFieldHelper.Internal exposing (nonExistentFieldLensNameInfo, printFieldLensDeclaration)
+import NoMissingRecordFieldHelper.Internal exposing (nonExistentFieldHelperNameInfo, printFieldHelperDeclaration)
 import Review.Test
 import Test exposing (Test, describe, test)
 
@@ -40,8 +40,8 @@ scoreAPoint =
                     |> Review.Test.expectErrorsForModules
                         [ ( "Accessors.Library.Fields"
                           , [ Review.Test.error
-                                { message = nonExistentFieldLensNameInfo "score" |> .message
-                                , details = nonExistentFieldLensNameInfo "score" |> .details
+                                { message = nonExistentFieldHelperNameInfo "score" |> .message
+                                , details = nonExistentFieldHelperNameInfo "score" |> .details
                                 , under = "Accessors.Library.Fields"
                                 }
                                 |> Review.Test.whenFixed
@@ -85,8 +85,8 @@ scoreAPoint =
                     |> Review.Test.expectErrorsForModules
                         [ ( "Accessors.Library.Fields"
                           , [ Review.Test.error
-                                { message = nonExistentFieldLensNameInfo "score" |> .message
-                                , details = nonExistentFieldLensNameInfo "score" |> .details
+                                { message = nonExistentFieldHelperNameInfo "score" |> .message
+                                , details = nonExistentFieldHelperNameInfo "score" |> .details
                                 , under = "Accessors.Library.Fields"
                                 }
                                 |> Review.Test.whenFixed
@@ -130,8 +130,8 @@ scoreAPoint =
                     |> Review.Test.expectErrorsForModules
                         [ ( "Accessors.Library.Fields"
                           , [ Review.Test.error
-                                { message = nonExistentFieldLensNameInfo "score" |> .message
-                                , details = nonExistentFieldLensNameInfo "score" |> .details
+                                { message = nonExistentFieldHelperNameInfo "score" |> .message
+                                , details = nonExistentFieldHelperNameInfo "score" |> .details
                                 , under = "Accessors.Library.Fields"
                                 }
                                 |> Review.Test.whenFixed
@@ -179,8 +179,8 @@ scoreAPoint =
                     |> Review.Test.expectErrorsForModules
                         [ ( "Accessors.Library.Fields"
                           , [ Review.Test.error
-                                { message = nonExistentFieldLensNameInfo "score" |> .message
-                                , details = nonExistentFieldLensNameInfo "score" |> .details
+                                { message = nonExistentFieldHelperNameInfo "score" |> .message
+                                , details = nonExistentFieldHelperNameInfo "score" |> .details
                                 , under = "Accessors.Library.Fields"
                                 }
                                 |> Review.Test.whenFixed
@@ -213,7 +213,7 @@ declarations =
         [ test "elm-accessors"
             (\() ->
                 accessors.declaration
-                    |> printFieldLensDeclaration { fieldName = "score" }
+                    |> printFieldHelperDeclaration { fieldName = "score" }
                     |> Expect.equal
                         """score : Relation score sub wrap -> Relation { record | score : score } sub wrap
 score =
@@ -222,7 +222,7 @@ score =
         , test "elm-monocle"
             (\() ->
                 monocle.declaration
-                    |> printFieldLensDeclaration { fieldName = "score" }
+                    |> printFieldHelperDeclaration { fieldName = "score" }
                     |> Expect.equal
                         """score : Lens { record | score : score } score
 score =
@@ -231,7 +231,7 @@ score =
         , test "elm-fields"
             (\() ->
                 fields.declaration
-                    |> printFieldLensDeclaration { fieldName = "score" }
+                    |> printFieldHelperDeclaration { fieldName = "score" }
                     |> Expect.equal
                         """score :
     { get : { a | score : score } -> score
@@ -243,7 +243,7 @@ score =
         , test "zipper"
             (\() ->
                 zipper.declaration
-                    |> printFieldLensDeclaration { fieldName = "score" }
+                    |> printFieldHelperDeclaration { fieldName = "score" }
                     |> Expect.equal
                         """intoScore : Zipper { record | score : score } root -> Zipper score root
 intoScore =
