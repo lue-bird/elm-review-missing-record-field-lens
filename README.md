@@ -21,6 +21,24 @@ InputAdded path newInput ->
 ```
 which is ... suboptimal.
 
+Using some update helpers:
+```elm
+import Record exposing (updateProjects, updateCalls)
+
+InputAdded path newInput ->
+    model
+        |> updateProjects
+            (ZipList.updateSelected
+                (updateCalls
+                    (List.map
+                        (Tree.updateAt path
+                            (Tree.prependChild newInput)
+                        )
+                    )
+                )
+            )
+```
+
 Using lenses:
 ```elm
 import Field
@@ -38,15 +56,18 @@ InputAdded path newInput ->
                 (Tree.prependChild newInput)
             )
 ```
-the code becomes more **readable**.
 
-The biggest pain-point with these lenses is the need to manually create one for every used field.
 
-→ This [`elm-review`](https://package.elm-lang.org/packages/jfmengels/elm-review/latest/) rule generates all those record field lenses that don't exist yet.
+Using methods similar to those, the code becomes more **readable**.
 
-In this example: `Field.projects` and `Field.calls` will automatically be generated in `Field.elm`.
+The biggest pain-point with these helpers is the need to manually create one for every used field.
 
-#### lenses that work out of the box:
+→ This [`elm-review`](https://package.elm-lang.org/packages/jfmengels/elm-review/latest/) rule automatically generates record field helpers that don't exist yet.
+
+- In example 1: `updateProjects` & `updateCalls` will be generated in `Record.elm`
+- In example 2: `Field.projects` & `Field.calls` will be generated in `Field.elm`
+
+#### helpers that work out of the box:
 
 - [bChiquet's elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
 - [sjorn3's elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
@@ -67,11 +88,10 @@ import Review.Rule exposing (Rule)
 config : List Rule
 config =
     [ NoMissingRecordFieldHelper.rule
-        [ { generate = [ NoMissingRecordFieldHelper.accessors ]
-          , generateIn =
-              ( "Accessors", [ "Library", "RecordFields" ] )
-          }
-        ]
+        { generate = [ NoMissingRecordFieldHelper.accessors ]
+        , generateIn =
+            ( "Accessors", [ "Library", "RecordFields" ] )
+        }
     ]
 ```
 See [`Config`](NoMissingRecordFieldHelper#Config)
