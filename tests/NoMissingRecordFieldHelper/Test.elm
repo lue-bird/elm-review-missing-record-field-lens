@@ -1,7 +1,7 @@
 module NoMissingRecordFieldHelper.Test exposing (all)
 
 import Expect
-import NoMissingRecordFieldHelper exposing (rule)
+import NoMissingRecordFieldLens exposing (rule)
 import NoMissingRecordFieldHelper.Internal exposing (nonExistentFieldHelperNameInfo)
 import RecordFieldHelper exposing (accessors, fields, monocle, printDeclaration, set, update, zipper)
 import Review.Test
@@ -10,7 +10,7 @@ import Test exposing (Test, describe, test)
 
 all : Test
 all =
-    describe "NoMissingRecordFieldHelper"
+    describe "NoMissingRecordFieldLens"
         [ fail, success, declarations ]
 
 

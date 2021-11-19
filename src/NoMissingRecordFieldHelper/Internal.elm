@@ -191,7 +191,7 @@ rule { generator, generateIn } =
                                         []
                     )
     in
-    Rule.newProjectRuleSchema "NoMissingRecordFieldHelper"
+    Rule.newProjectRuleSchema "NoMissingRecordFieldLens"
         initialProjectContext
         |> Rule.withModuleVisitor
             (Rule.withModuleDefinitionVisitor
@@ -403,7 +403,7 @@ type alias Config =
     }
 
 
-{-| How to generate a [`FieldHelperDeclaration`](NoMissingRecordFieldHelper#FieldHelperDeclaration) plus the necessary imports.
+{-| How to generate a [`FieldHelperDeclaration`](NoMissingRecordFieldLens#FieldHelperDeclaration) plus the necessary imports.
 -}
 type alias FieldHelperGenerator =
     { imports : List CodeGen.Import

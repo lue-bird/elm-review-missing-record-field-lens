@@ -1,4 +1,4 @@
-module NoMissingRecordFieldHelper exposing
+module NoMissingRecordFieldLens exposing
     ( rule, Config
     , accessors, monocle, fields, zipper
     , FieldHelperGenerator, FieldHelperDeclaration, functionsForField, getSetRecordForField, withDocumentation, withName
@@ -40,8 +40,8 @@ Examples are
 
 ```
 config =
-    [ NoMissingRecordFieldHelper.rule
-        { generate = NoMissingRecordFieldHelper.accessors
+    [ NoMissingRecordFieldLens.rule
+        { generate = NoMissingRecordFieldLens.accessors
         , generateIn = ( "Accessors", [ "Library", "Fields" ] )
         }
     ]

@@ -82,19 +82,19 @@ Note: It's also possible to generate custom lenses or to customize the generatio
 ```elm
 module ReviewConfig exposing (config)
 
-import NoMissingRecordFieldHelper
+import NoMissingRecordFieldLens
 import Review.Rule exposing (Rule)
 
 config : List Rule
 config =
-    [ NoMissingRecordFieldHelper.rule
-        { generate = [ NoMissingRecordFieldHelper.accessors ]
+    [ NoMissingRecordFieldLens.rule
+        { generate = [ NoMissingRecordFieldLens.accessors ]
         , generateIn =
             ( "Accessors", [ "Library", "RecordFields" ] )
         }
     ]
 ```
-See [`Config`](NoMissingRecordFieldHelper#Config)
+See [`Config`](NoMissingRecordFieldLens#Config)
 
 ## suggestions?
 → [contributing](https://github.com/lue-bird/elm-review-missing-record-field-lens/blob/master/contributing.md).
