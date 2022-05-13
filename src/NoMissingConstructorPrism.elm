@@ -279,27 +279,6 @@ implementation ctor =
     }
 
 
-
--- nonEmpty : List a -> Maybe (List a)
--- nonEmpty =
---     nelFromList >> Maybe.map nelToList
-
-
-nelToList : ( a, List a ) -> List a
-nelToList ( first, rest ) =
-    first :: rest
-
-
-nelFromList : List a -> Maybe ( a, List a )
-nelFromList ls =
-    case ls of
-        [] ->
-            Nothing
-
-        hd :: tl ->
-            Just ( hd, tl )
-
-
 nested : (List a -> a) -> List a -> List a
 nested toA tpls =
     case tpls of
