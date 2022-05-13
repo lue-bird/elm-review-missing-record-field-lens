@@ -1,5 +1,9 @@
 # changelog
 
+### 1.1.0
+
+Added `NoMissingConstructorPrism`
+
 #### 1.0.2
 
 Added `import Accessors exposing (over)`
