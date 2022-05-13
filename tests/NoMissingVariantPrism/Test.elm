@@ -1,21 +1,21 @@
-module NoMissingConstructorPrismTest exposing (all)
+module NoMissingVariantPrism.Test exposing (all)
 
-import NoMissingConstructorPrism exposing (rule)
+import NoMissingVariantPrism exposing (rule)
 import Review.Test
 import Test exposing (Test, describe, test)
 
 
 all : Test
 all =
-    describe "NoMissingConstructorPrism"
+    describe "NoMissingVariantPrism"
         [ describe "should generate" shouldGenerate
-        , describe "should NOT" dontGenerate
+        , describe "should not generate" dontGenerate
         ]
 
 
 shouldGenerate : List Test
 shouldGenerate =
-    [ test "Prism for types with more than one type variable and tuple up arguments given to the same constructor"
+    [ test "Prism for types with more than one type variable and tuple up arguments given to the same variant"
         (\() ->
             """module A exposing (..)
 
@@ -26,8 +26,8 @@ type Data3 a b c d
                 |> Review.Test.run rule
                 |> Review.Test.expectErrors
                     [ Review.Test.error
-                        { message = "Generating a `c_Data3_Wat` Prism for the type constructor: `Data3_Wat`."
-                        , details = [ "missing prism for constructor `Data3_Wat`" ]
+                        { message = "Generating a `c_Data3_Wat` Prism for the type variant: `Data3_Wat`."
+                        , details = [ "missing prism for variant `Data3_Wat`" ]
                         , under = "Data3_Wat a b c d"
                         }
                         |> Review.Test.whenFixed
@@ -81,8 +81,8 @@ type Data2 a b
                 |> Review.Test.run rule
                 |> Review.Test.expectErrors
                     [ Review.Test.error
-                        { message = "Generating a `c_Data2_Things` Prism for the type constructor: `Data2_Things`."
-                        , details = [ "missing prism for constructor `Data2_Things`" ]
+                        { message = "Generating a `c_Data2_Things` Prism for the type variant: `Data2_Things`."
+                        , details = [ "missing prism for variant `Data2_Things`" ]
                         , under = "Data2_Things a"
                         }
                         |> Review.Test.whenFixed
@@ -118,8 +118,8 @@ c_Data2_Things =
                     otherwise
         )"""
                     , Review.Test.error
-                        { message = "Generating a `c_Data2_Blah` Prism for the type constructor: `Data2_Blah`."
-                        , details = [ "missing prism for constructor `Data2_Blah`" ]
+                        { message = "Generating a `c_Data2_Blah` Prism for the type variant: `Data2_Blah`."
+                        , details = [ "missing prism for variant `Data2_Blah`" ]
                         , under = "Data2_Blah b"
                         }
                         |> Review.Test.whenFixed
@@ -168,8 +168,8 @@ type Data1 a
                 |> Review.Test.run rule
                 |> Review.Test.expectErrors
                     [ Review.Test.error
-                        { message = "Generating a `c_Data1_Stuff` Prism for the type constructor: `Data1_Stuff`."
-                        , details = [ "missing prism for constructor `Data1_Stuff`" ]
+                        { message = "Generating a `c_Data1_Stuff` Prism for the type variant: `Data1_Stuff`."
+                        , details = [ "missing prism for variant `Data1_Stuff`" ]
                         , under = "Data1_Stuff a"
                         }
                         |> Review.Test.whenFixed
@@ -219,7 +219,7 @@ type NotAVariant =
 """
                 |> Review.Test.run rule
                 |> Review.Test.expectNoErrors
-    , test "generate Prism for constructors that already have a prism defined." <|
+    , test "generate Prism for variants that already have a prism defined." <|
         \() ->
             """module A exposing (..)
 

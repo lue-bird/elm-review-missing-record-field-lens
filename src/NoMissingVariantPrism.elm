@@ -1,4 +1,4 @@
-module NoMissingConstructorPrism exposing (rule)
+module NoMissingVariantPrism exposing (rule)
 
 {-|
 
@@ -24,7 +24,7 @@ Because functions in elm can't start with a capitol letter OR an underscore `_`
 The prefix `c_` is used as a way to namespace the generated code.
 
     config =
-        [ NoMissingConstructorPrism.rule
+        [ NoMissingVariantPrism.rule
         ]
 
 see the `tests/` for examples of the sort of code that's generated.
@@ -44,13 +44,13 @@ boilerplate related to updating potentially deeply nested data.
 ## try it without installation
 
 ```bash
-elm-review --rules NoMissingConstructorPrism SomeModule.elm
+elm-review --rules NoMissingVariantPrism SomeModule.elm
 ```
 
 -}
 rule : Rule
 rule =
-    Rule.newModuleRuleSchema "NoMissingConstructorPrism" ()
+    Rule.newModuleRuleSchema "NoMissingVariantPrism" ()
         -- Add your visitors
         -- |> Rule.fromModuleRuleSchema
         |> Rule.withDeclarationListVisitor generatePrismFromTypeDecl
@@ -85,7 +85,7 @@ generatePrismFromTypeDecl nodes ctx =
                     let
                         isAdt : Bool
                         isAdt =
-                            -- If custom type only has one constructor then
+                            -- If custom type only has one variant then
                             -- we can generate a Lens.
                             List.length type_.constructors > 1
                     in
@@ -105,8 +105,8 @@ generatePrismFromTypeDecl nodes ctx =
                                                     Just
                                                         (Just
                                                             (Rule.errorWithFix
-                                                                { message = "Generating a `c_" ++ ctorName ++ "` Prism for the type constructor: `" ++ ctorName ++ "`."
-                                                                , details = [ "missing prism for constructor `" ++ ctorName ++ "`" ]
+                                                                { message = "Generating a `c_" ++ ctorName ++ "` Prism for the type variant: `" ++ ctorName ++ "`."
+                                                                , details = [ "missing prism for variant `" ++ ctorName ++ "`" ]
                                                                 }
                                                                 errorRange
                                                                 [ Fix.insertAt
