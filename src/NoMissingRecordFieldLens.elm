@@ -40,7 +40,7 @@ Examples are
 ```
 config =
     [ NoMissingRecordFieldLens.rule
-        { generate = NoMissingRecordFieldLens.accessors
+        { generator = NoMissingRecordFieldLens.accessors
         , generateIn = ( "Accessors", [ "Library", "Fields" ] )
         }
     ]
