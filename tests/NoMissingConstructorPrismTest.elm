@@ -15,8 +15,8 @@ all =
 
 shouldGenerate : List Test
 shouldGenerate =
-    [ test "Prism for types with more than one type variable and tuple up arguments given to the same constructor" <|
-        \() ->
+    [ test "Prism for types with more than one type variable and tuple up arguments given to the same constructor"
+        (\() ->
             """module A exposing (..)
 
 type Data3 a b c d
@@ -66,8 +66,9 @@ c_Data3_Wat =
                     otherwise
         )"""
                     ]
-    , test "Prisms for types with more than one type variable" <|
-        \() ->
+        )
+    , test "Prisms for types with more than one type variable"
+        (\() ->
             """module A exposing (..)
 
 
@@ -154,8 +155,9 @@ c_Data2_Blah =
                     otherwise
         )"""
                     ]
-    , test "a basic prism" <|
-        \() ->
+        )
+    , test "a basic prism"
+        (\() ->
             """module A exposing (..)
 
 
@@ -201,6 +203,7 @@ c_Data1_Stuff =
                     otherwise
         )"""
                     ]
+        )
     ]
 
 
