@@ -62,20 +62,18 @@ Using methods similar to those, the code becomes more **readable**.
 
 The biggest pain-point with these helpers is the need to manually create one for every used field.
 
-→ This [`elm-review`](https://package.elm-lang.org/packages/jfmengels/elm-review/latest/) rule automatically generates record field helpers that don't exist yet.
+→ This [`elm-review`](https://package.elm-lang.org/packages/jfmengels/elm-review/latest/) rule automatically generates record field lenses that don't exist yet.
 
-- In example 1: `updateProjects` & `updateCalls` will be generated in `Record.elm`
-- In example 2: `Field.projects` & `Field.calls` will be generated in `Field.elm`
+In the last example, `Field.projects` & `Field.calls` will be generated in `Field.elm`
 
 #### helpers that work out of the box:
 
-- `updateField`, `setField`
 - [bChiquet's elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
 - [sjorn3's elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
 - [arturopala's elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
 - [zh5's zipper](https://package.elm-lang.org/packages/z5h/zipper/latest/)
 
-Note: It's also possible to generate custom lenses or to customize the generation of existing ones.
+It's also possible to generate custom lenses or to customize the generation of existing ones.
 
 ## configuration
 
@@ -88,7 +86,7 @@ import Review.Rule exposing (Rule)
 config : List Rule
 config =
     [ NoMissingRecordFieldLens.rule
-        { generate = [ NoMissingRecordFieldLens.accessors ]
+        { generator = [ NoMissingRecordFieldLens.accessors ]
         , generateIn =
             ( "Accessors", [ "Library", "RecordFields" ] )
         }
