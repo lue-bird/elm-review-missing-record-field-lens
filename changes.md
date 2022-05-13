@@ -2,7 +2,7 @@
 
 ### 1.1.0
 
-Added `NoMissingConstructorPrism`
+Added `NoMissingVariantPrism` (by @erlandsona)
 
 #### 1.0.2
 
