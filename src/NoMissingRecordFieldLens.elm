@@ -32,7 +32,6 @@ import Review.Rule exposing (Rule)
 
 Examples are
 
-  - `updateField`, `setField`
   - [bChiquet's elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
   - [sjorn3's elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
   - [arturopala's elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
