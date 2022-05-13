@@ -209,8 +209,8 @@ c_Data1_Stuff =
 
 dontGenerate : List Test
 dontGenerate =
-    [ test "attempt to fix Lens-able types" <|
-        \() ->
+    [ test "attempt to fix Lens-able types"
+        (\() ->
             """module A exposing (..)
 
 
@@ -219,8 +219,9 @@ type NotAVariant =
 """
                 |> Review.Test.run rule
                 |> Review.Test.expectNoErrors
-    , test "generate Prism for variants that already have a prism defined." <|
-        \() ->
+        )
+    , test "generate Prism for variants that already have a prism defined."
+        (\() ->
             """module A exposing (..)
 
 type AlreadyDefined a
@@ -245,4 +246,5 @@ c_DontError =
 """
                 |> Review.Test.run rule
                 |> Review.Test.expectNoErrors
+        )
     ]
