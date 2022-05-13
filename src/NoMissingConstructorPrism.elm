@@ -18,7 +18,7 @@ import Review.Rule as Rule exposing (Error, Rule)
 
 
 {-| Uses the Review.Fix api to generate elm-accessors based Prisms for
-Custom Types that don't alread have one defined.
+Custom Types that don't already have one defined.
 Because functions in Elm can't start with a capitol letter OR an underscore `_`
 I've used the prefix `c_` as a way to namespace the generated code.
 
@@ -35,7 +35,7 @@ This rule is useful when you and you're team are using elm-accessors to mitigate
 boilerplate related to updating potentially deeply nested data.
 
 This rule is not useful if you buy into the assumption that Lenses are "too hard"
-or "aren't readible".
+or "aren't readable".
 
 
 ## Try it out
