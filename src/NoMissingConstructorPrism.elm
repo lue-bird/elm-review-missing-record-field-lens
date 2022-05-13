@@ -189,7 +189,7 @@ printPrism t ctor =
         )
         fnName
         []
-        -- TODO: Add import Accessors exposing (makeOneToOne) or whatever for any
+        -- TODO: Add `import Accessors exposing (makeOneToN_)` or whatever for any
         -- modules we're generating code for.
         (CodeGen.construct "makeOneToN_"
             [ CodeGen.string fnName
@@ -238,7 +238,6 @@ implementation ctor =
                 ]
             )
     , update =
-        -- TODO: Maybe generate Settable version instead of just the mapping version?
         CodeGen.lambda
             [ CodeGen.varPattern "fn"
             , CodeGen.varPattern "t"
