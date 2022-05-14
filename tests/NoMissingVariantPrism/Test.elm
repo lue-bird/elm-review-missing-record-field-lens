@@ -1,6 +1,6 @@
 module NoMissingVariantPrism.Test exposing (all)
 
-import NoMissingVariantPrism exposing (rule)
+import NoMissingVariantPrism exposing (accessors, rule)
 import Review.Test
 import Test exposing (Test, describe, test)
 
@@ -23,10 +23,10 @@ type Data3 a b c d
     = Data3_Wat a b c d
     | Data3_Otherwise
 """
-                |> Review.Test.run rule
+                |> Review.Test.run (rule { generator = accessors })
                 |> Review.Test.expectErrors
                     [ Review.Test.error
-                        { message = "Generating a `c_Data3_Wat` Prism for the type variant: `Data3_Wat`."
+                        { message = "Generating a `variantData3_Wat` Prism for the type variant: `Data3_Wat`."
                         , details = [ "missing prism for variant `Data3_Wat`" ]
                         , under = "Data3_Wat a b c d"
                         }
@@ -39,12 +39,12 @@ type Data3 a b c d
 
 
 
-c_Data3_Wat :
+variantData3_Wat :
     Relation ( a, ( b, ( c, d ) ) ) reachable wrap
     -> Relation (Data3 a b c d) reachable (Maybe wrap)
-c_Data3_Wat =
+variantData3_Wat =
     makeOneToN
-        "c_Data3_Wat"
+        "variantData3_Wat"
         (\\fn t ->
             case t of
                 Data3_Wat a0 a1 a2 a3 ->
@@ -57,10 +57,10 @@ c_Data3_Wat =
             case t of
                 Data3_Wat a0 a1 a2 a3 ->
                     let
-                        apply_c ctor ( t0, ( t1, ( t2, t3 ) ) ) =
-                            ctor t0 t1 t2 t3
+                        variantFeed variant ( t0, ( t1, ( t2, t3 ) ) ) =
+                            variant t0 t1 t2 t3
                     in
-                    apply_c Data3_Wat (fn ( a0, ( a1, ( a2, a3 ) ) ))
+                    variantFeed Data3_Wat (fn ( a0, ( a1, ( a2, a3 ) ) ))
 
                 otherwise ->
                     otherwise
@@ -78,10 +78,10 @@ type Data2 a b
     | Data2_Blah b
     | Data2_Otherwise
 """
-                |> Review.Test.run rule
+                |> Review.Test.run (rule { generator = accessors })
                 |> Review.Test.expectErrors
                     [ Review.Test.error
-                        { message = "Generating a `c_Data2_Things` Prism for the type variant: `Data2_Things`."
+                        { message = "Generating a `variantData2_Things` Prism for the type variant: `Data2_Things`."
                         , details = [ "missing prism for variant `Data2_Things`" ]
                         , under = "Data2_Things a"
                         }
@@ -97,10 +97,10 @@ type Data2 a b
 
 
 
-c_Data2_Things : Relation a reachable wrap -> Relation (Data2 a b) reachable (Maybe wrap)
-c_Data2_Things =
+variantData2_Things : Relation a reachable wrap -> Relation (Data2 a b) reachable (Maybe wrap)
+variantData2_Things =
     makeOneToN
-        "c_Data2_Things"
+        "variantData2_Things"
         (\\fn t ->
             case t of
                 Data2_Things a0 ->
@@ -118,7 +118,7 @@ c_Data2_Things =
                     otherwise
         )"""
                     , Review.Test.error
-                        { message = "Generating a `c_Data2_Blah` Prism for the type variant: `Data2_Blah`."
+                        { message = "Generating a `variantData2_Blah` Prism for the type variant: `Data2_Blah`."
                         , details = [ "missing prism for variant `Data2_Blah`" ]
                         , under = "Data2_Blah b"
                         }
@@ -134,10 +134,10 @@ type Data2 a b
 
 
 
-c_Data2_Blah : Relation b reachable wrap -> Relation (Data2 a b) reachable (Maybe wrap)
-c_Data2_Blah =
+variantData2_Blah : Relation b reachable wrap -> Relation (Data2 a b) reachable (Maybe wrap)
+variantData2_Blah =
     makeOneToN
-        "c_Data2_Blah"
+        "variantData2_Blah"
         (\\fn t ->
             case t of
                 Data2_Blah a0 ->
@@ -165,10 +165,10 @@ type Data1 a
     = Data1_Stuff a
     | Data1_Otherwise
 """
-                |> Review.Test.run rule
+                |> Review.Test.run (rule { generator = accessors })
                 |> Review.Test.expectErrors
                     [ Review.Test.error
-                        { message = "Generating a `c_Data1_Stuff` Prism for the type variant: `Data1_Stuff`."
+                        { message = "Generating a `variantData1_Stuff` Prism for the type variant: `Data1_Stuff`."
                         , details = [ "missing prism for variant `Data1_Stuff`" ]
                         , under = "Data1_Stuff a"
                         }
@@ -182,10 +182,10 @@ type Data1 a
 
 
 
-c_Data1_Stuff : Relation a reachable wrap -> Relation (Data1 a) reachable (Maybe wrap)
-c_Data1_Stuff =
+variantData1_Stuff : Relation a reachable wrap -> Relation (Data1 a) reachable (Maybe wrap)
+variantData1_Stuff =
     makeOneToN
-        "c_Data1_Stuff"
+        "variantData1_Stuff"
         (\\fn t ->
             case t of
                 Data1_Stuff a0 ->
@@ -217,7 +217,7 @@ dontGenerate =
 type NotAVariant =
     NotAVariant String
 """
-                |> Review.Test.run rule
+                |> Review.Test.run (rule { generator = accessors })
                 |> Review.Test.expectNoErrors
         )
     , test "generate Prism for variants that already have a prism defined."
@@ -228,9 +228,9 @@ type AlreadyDefined a
     = DontError a
     | Whatever
 
-c_DontError : Prism (AlreadyDefined a) a
-c_DontError =
-    makeOneToOne "c_DontError"
+variantDontError : Prism (AlreadyDefined a) a
+variantDontError =
+    makeOneToOne "variantDontError"
         (\\t ->
             case t of
                 DontError a -> Just a
@@ -244,7 +244,7 @@ c_DontError =
 
 
 """
-                |> Review.Test.run rule
+                |> Review.Test.run (rule { generator = accessors })
                 |> Review.Test.expectNoErrors
         )
     ]

@@ -1,27 +1,50 @@
-module NoMissingVariantPrism exposing (rule)
+module NoMissingVariantPrism exposing
+    ( rule
+    , accessors
+    , VariantPrismGenerator, VariantPrismDeclaration, implementation, withDocumentation, withName
+    )
 
 {-|
 
 @docs rule
 
+
+# lens generators
+
+
+## working out of the box
+
+@docs accessors
+
+
+## custom
+
+@docs VariantPrismGenerator, VariantPrismDeclaration, implementation, withDocumentation, withName
+
 -}
 
-import Dict
-import Elm.CodeGen as CodeGen exposing (TypeAnnotation)
-import Elm.Pretty exposing (prettyDeclaration)
-import Elm.Syntax.Declaration exposing (Declaration(..))
+import Dict exposing (Dict)
+import Elm.CodeGen as CodeGen
+import Elm.Pretty as CodeGen
+import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Node as Node exposing (Node(..))
+import Elm.Syntax.Range exposing (Location, Range)
 import Elm.Syntax.Type exposing (Type, ValueConstructor)
+import Hand exposing (Empty, Hand(..))
+import Help exposing (indexed)
+import Parser exposing ((|.), (|=), Parser)
+import Possibly exposing (Possibly(..))
 import Pretty exposing (pretty)
 import Review.Fix as Fix
-import Review.Rule as Rule exposing (Error, Rule)
+import Review.Rule as Rule exposing (Rule)
+import Stack exposing (StackTopBelow(..), Stacked)
 
 
 {-| Generate `elm-accessors` based Prisms for
 custom Types that don't already have one defined.
 
 Because functions in elm can't start with a capitol letter OR an underscore `_`
-The prefix `c_` is used as a way to namespace the generated code.
+The prefix `variant` is used as a way to namespace the generated code.
 
     config =
         [ NoMissingVariantPrism.rule
@@ -40,251 +63,478 @@ boilerplate related to updating potentially deeply nested data.
 
 ... when you consider lenses the less readable/intuitive/simple/explicit alternative.
 
-
-## try it without installation
-
-```bash
-elm-review --rules NoMissingVariantPrism SomeModule.elm
-```
-
 -}
-rule : Rule
-rule =
-    Rule.newModuleRuleSchema "NoMissingVariantPrism" ()
-        -- Add your visitors
-        -- |> Rule.fromModuleRuleSchema
-        |> Rule.withDeclarationListVisitor generatePrismFromTypeDecl
+rule : { generator : VariantPrismGenerator } -> Rule
+rule { generator } =
+    Rule.newModuleRuleSchema "NoMissingVariantPrism"
+        initialContext
+        -- TODO: `import Accessors exposing (makeOneToN_)` in modules we're generating code for
+        |> Rule.withDeclarationEnterVisitor
+            (\declarationNode context ->
+                ( []
+                , context |> visitDeclaration declarationNode
+                )
+            )
+        |> Rule.withFinalModuleEvaluation
+            (\context ->
+                generatePrisms { context = context, generator = generator }
+            )
         |> Rule.fromModuleRuleSchema
 
 
-generatePrismFromTypeDecl : List (Node Declaration) -> moduleContext -> ( List (Error {}), moduleContext )
-generatePrismFromTypeDecl nodes ctx =
-    ( List.foldr
-        (\(Node injectionRange node) acc ->
-            case node of
-                FunctionDeclaration fn ->
-                    let
-                        fnName : String
-                        fnName =
-                            fn.declaration
-                                |> Node.value
-                                |> .name
-                                |> Node.value
-
-                        ctorName : String
-                        ctorName =
-                            fnName |> String.dropLeft 2
-                    in
-                    if fnName |> String.startsWith "c_" then
-                        Dict.insert ctorName Nothing acc
-
-                    else
-                        acc
-
-                CustomTypeDeclaration type_ ->
-                    let
-                        isAdt : Bool
-                        isAdt =
-                            -- If custom type only has one variant then
-                            -- we can generate a Lens.
-                            List.length type_.constructors > 1
-                    in
-                    if isAdt then
-                        List.foldr
-                            (\(Node errorRange ctor) ->
-                                let
-                                    ctorName : String
-                                    ctorName =
-                                        Node.value ctor.name
-                                in
-                                if List.length ctor.arguments > 0 then
-                                    Dict.update ctorName
-                                        (\m ->
-                                            case m of
-                                                Nothing ->
-                                                    Just
-                                                        (Just
-                                                            (Rule.errorWithFix
-                                                                { message = "Generating a `c_" ++ ctorName ++ "` Prism for the type variant: `" ++ ctorName ++ "`."
-                                                                , details = [ "missing prism for variant `" ++ ctorName ++ "`" ]
-                                                                }
-                                                                errorRange
-                                                                [ Fix.insertAt
-                                                                    { row = injectionRange.end.row + 1
-                                                                    , column = injectionRange.end.column
-                                                                    }
-                                                                    ("\n\n\n"
-                                                                        ++ printPrism type_ ctor
-                                                                    )
-                                                                ]
-                                                            )
-                                                        )
-
-                                                otherwise ->
-                                                    otherwise
-                                        )
-
-                                else
-                                    identity
-                            )
-                            acc
-                            type_.constructors
-
-                    else
-                        acc
-
-                _ ->
-                    acc
-        )
-        Dict.empty
-        nodes
-        |> Dict.values
-        |> List.filterMap identity
-    , ctx
-    )
+type alias Context =
+    Dict String VariantTypePrism
 
 
-printPrism : Type -> ValueConstructor -> String
-printPrism t ctor =
+type VariantTypePrism
+    = VariantTypePrismAlreadyExists
+    | VariantTypePrismMissing
+        { typeRange : Range
+        , variantValues : List CodeGen.TypeAnnotation
+        , type_ : CodeGen.TypeAnnotation
+        , typeDeclarationEnd : Location
+        }
+
+
+initialContext : Context
+initialContext =
+    Dict.empty
+
+
+variantPrismNameParser : Parser String
+variantPrismNameParser =
+    Parser.succeed identity
+        |. Parser.token "variant"
+        |= (Parser.succeed () |> Parser.getChompedString)
+
+
+visitDeclaration : Node Declaration -> Context -> Context
+visitDeclaration declarationNode =
     let
-        typeName : String
-        typeName =
-            Node.value t.name
-
-        generics : List String
-        generics =
-            List.map Node.value t.generics
-
-        ctorName : String
-        ctorName =
-            Node.value ctor.name
-
-        { access, update } =
-            implementation ctor
-
-        fnName : String
-        fnName =
-            "c_" ++ ctorName
+        (Node declarationRange declaration) =
+            declarationNode
     in
-    CodeGen.funDecl
-        Nothing
-        -- TODO: Upgrade once I figure out a `type alias Optional`
-        (CodeGen.funAnn
-            (CodeGen.typed "Relation"
-                ((ctor.arguments
-                    |> List.map Node.value
-                    |> nested CodeGen.tupleAnn
-                 )
-                    ++ [ CodeGen.typeVar "reachable"
-                       , CodeGen.typeVar "wrap"
-                       ]
-                )
+    case declaration of
+        Declaration.FunctionDeclaration functionDeclaration ->
+            let
+                functionName : String
+                functionName =
+                    functionDeclaration.declaration
+                        |> Node.value
+                        |> .name
+                        |> Node.value
+            in
+            case functionName |> Parser.run variantPrismNameParser of
+                Ok prismName ->
+                    Dict.insert prismName VariantTypePrismAlreadyExists
+
+                Err _ ->
+                    identity
+
+        Declaration.CustomTypeDeclaration type_ ->
+            case type_.constructors of
+                -- If it only has one variant then we can't generate a lens (is that what you wanted to comment @erlandsona ?)
+                _ :: _ :: _ ->
+                    \context ->
+                        type_.constructors
+                            |> List.foldr
+                                (\(Node typeRange variant) ->
+                                    case variant.arguments of
+                                        [] ->
+                                            identity
+
+                                        _ :: _ ->
+                                            Dict.update (variant.name |> Node.value)
+                                                (\m ->
+                                                    case m of
+                                                        Nothing ->
+                                                            VariantTypePrismMissing
+                                                                { typeRange = typeRange
+                                                                , type_ =
+                                                                    CodeGen.typed
+                                                                        (type_.name |> Node.value)
+                                                                        (type_.generics
+                                                                            |> List.map
+                                                                                (\(Node _ typeVarName) ->
+                                                                                    CodeGen.typeVar typeVarName
+                                                                                )
+                                                                        )
+                                                                , typeDeclarationEnd = declarationRange.end
+                                                                , variantValues =
+                                                                    variant.arguments
+                                                                        |> List.map Node.value
+                                                                }
+                                                                |> Just
+
+                                                        Just variantTypePrismInfo ->
+                                                            variantTypePrismInfo |> Just
+                                                )
+                                )
+                                context
+
+                [ _ ] ->
+                    identity
+
+                [] ->
+                    identity
+
+        _ ->
+            identity
+
+
+generatePrisms :
+    { generator : VariantPrismGenerator, context : Context }
+    -> List (Rule.Error {})
+generatePrisms { context, generator } =
+    context
+        |> Dict.toList
+        |> List.filterMap
+            (\( variantName, variantTypePrismInfo ) ->
+                case variantTypePrismInfo of
+                    VariantTypePrismAlreadyExists ->
+                        Nothing
+
+                    VariantTypePrismMissing variantTypePrismInfoForGenerating ->
+                        ( variantName, variantTypePrismInfoForGenerating ) |> Just
             )
-            (CodeGen.typed "Relation"
-                [ CodeGen.typed typeName (List.map CodeGen.typeVar generics)
-                , CodeGen.typeVar "reachable"
-                , CodeGen.maybeAnn (CodeGen.typeVar "wrap")
-                ]
+        |> List.map
+            (\( variantName, { variantValues, type_, typeDeclarationEnd, typeRange } ) ->
+                Rule.errorWithFix
+                    { message = "The variant `" ++ variantName ++ "` doesn't have a prism."
+                    , details = [ "Add the auto-generated lens through the fix." ]
+                    }
+                    typeRange
+                    [ [ "\n\n\n"
+                      , generator.declaration
+                            { type_ = type_
+                            , variantName = variantName
+                            , variantValues = variantValues
+                            }
+                            |> prismDeclarationCodeGen
+                            |> CodeGen.prettyDeclaration 100
+                            |> pretty 100
+                      ]
+                        |> String.concat
+                        |> Fix.insertAt
+                            { typeDeclarationEnd
+                                | row = typeDeclarationEnd.row + 1
+                            }
+                    ]
             )
-            |> Just
-        )
-        fnName
-        []
-        -- TODO: Add `import Accessors exposing (makeOneToN_)` or whatever for any
-        -- modules we're generating code for.
-        (CodeGen.construct "makeOneToN_"
-            [ CodeGen.string fnName
-            , access
-            , update
-            ]
-        )
-        |> prettyDeclaration 100
-        |> pretty 100
+
+
+prismDeclarationCodeGen : VariantPrismDeclaration -> CodeGen.Declaration
+prismDeclarationCodeGen =
+    \prismDeclaration ->
+        CodeGen.funDecl
+            prismDeclaration.documentation
+            prismDeclaration.annotation
+            prismDeclaration.name
+            []
+            prismDeclaration.implementation
 
 
 implementation :
-    ValueConstructor
+    { variantName : String
+    , variantValues : List CodeGen.TypeAnnotation
+    }
     ->
         { access : CodeGen.Expression
-
-        -- , set : CodeGen.Expression
-        , update : CodeGen.Expression
+        , alter : CodeGen.Expression
         }
-implementation ctor =
+implementation { variantName, variantValues } =
     let
-        ctorName : String
-        ctorName =
-            Node.value ctor.name
+        variantValuesCode =
+            case variantValues |> Stack.fromList of
+                Empty Possible ->
+                    { expression = CodeGen.unit
+                    , pattern = CodeGen.unitPattern
+                    }
+
+                Filled topDown ->
+                    { expression =
+                        Filled topDown
+                            |> Stack.map
+                                (\{ index } _ ->
+                                    CodeGen.val ("value" |> indexed index)
+                                )
+                            |> Stack.fold (\value soFar -> CodeGen.tuple [ soFar, value ])
+                    , pattern =
+                        Filled topDown
+                            |> Stack.map
+                                (\{ index } _ ->
+                                    CodeGen.varPattern ("value" |> indexed index)
+                                )
+                            |> Stack.fold (\value soFar -> CodeGen.tuplePattern [ soFar, value ])
+                    }
     in
     { access =
         CodeGen.lambda
-            [ CodeGen.varPattern "fn"
-            , CodeGen.varPattern "t"
+            [ CodeGen.varPattern "variantValuesAlter"
+            , CodeGen.varPattern "variantType"
             ]
-            (CodeGen.caseExpr (CodeGen.val "t")
-                [ ( CodeGen.namedPattern ctorName
-                        (List.indexedMap (\ix _ -> CodeGen.varPattern ("a" ++ String.fromInt ix)) ctor.arguments)
-                  , CodeGen.construct "Just"
-                        [ CodeGen.parens
-                            (CodeGen.construct "fn"
-                                --[ CodeGen.tuple (List.indexedMap (\ix _ -> CodeGen.val ("a" ++ String.fromInt ix)) ctor.arguments)
-                                (ctor.arguments
-                                    |> List.indexedMap (\ix _ -> CodeGen.val ("a" ++ String.fromInt ix))
-                                    |> nested CodeGen.tuple
+            (CodeGen.caseExpr (CodeGen.val "variantType")
+                [ ( CodeGen.namedPattern variantName
+                        (variantValues
+                            |> List.indexedMap
+                                (\index _ ->
+                                    CodeGen.varPattern ("value" |> indexed index)
                                 )
-                            )
+                        )
+                  , CodeGen.binOpChain
+                        variantValuesCode.expression
+                        CodeGen.piper
+                        [ CodeGen.fun "variantValuesAlter"
+                        , CodeGen.fun "Just"
                         ]
                   )
-                , ( CodeGen.allPattern, CodeGen.val "Nothing" )
+                , ( CodeGen.allPattern
+                  , CodeGen.val "Nothing"
+                  )
                 ]
             )
-    , update =
+    , alter =
         CodeGen.lambda
-            [ CodeGen.varPattern "fn"
-            , CodeGen.varPattern "t"
+            [ CodeGen.varPattern "variantValuesAlter"
+            , CodeGen.varPattern "variantType"
             ]
-            (CodeGen.caseExpr (CodeGen.val "t")
-                [ ( CodeGen.namedPattern ctorName
-                        (List.indexedMap (\ix _ -> CodeGen.varPattern ("a" ++ String.fromInt ix)) ctor.arguments)
-                  , if List.length ctor.arguments > 1 then
-                        CodeGen.letExpr
-                            [ CodeGen.letFunction "apply_c"
-                                (CodeGen.varPattern "ctor"
-                                    :: (ctor.arguments
-                                            |> List.indexedMap (\ix _ -> CodeGen.varPattern ("t" ++ String.fromInt ix))
-                                            |> nested CodeGen.tuplePattern
-                                       )
+            (CodeGen.caseExpr (CodeGen.val "variantType")
+                [ ( CodeGen.namedPattern variantName
+                        (variantValues
+                            |> List.indexedMap
+                                (\index _ ->
+                                    CodeGen.varPattern ("value" |> indexed index)
                                 )
-                                (CodeGen.construct "ctor" (ctor.arguments |> List.indexedMap (\ix _ -> CodeGen.val ("t" ++ String.fromInt ix))))
-                            ]
-                            (CodeGen.construct "apply_c"
-                                (CodeGen.fun ctorName
-                                    :: [ CodeGen.parens
-                                            (CodeGen.construct "fn"
-                                                --[ CodeGen.tuple (List.indexedMap (\ix _ -> CodeGen.val ("a" ++ String.fromInt ix)) ctor.arguments)
-                                                (ctor.arguments
-                                                    |> List.indexedMap (\ix _ -> CodeGen.val ("a" ++ String.fromInt ix))
-                                                    |> nested CodeGen.tuple
+                        )
+                  , case variantValues of
+                        _ :: (_ :: _) ->
+                            CodeGen.letExpr
+                                [ CodeGen.letFunction "variantValuesCurryTo"
+                                    [ CodeGen.varPattern "variantTagValue"
+                                    , variantValuesCode.pattern
+                                    ]
+                                    (CodeGen.construct "variantTagValue"
+                                        (variantValues
+                                            |> List.indexedMap
+                                                (\index _ ->
+                                                    CodeGen.val ("value" |> indexed index)
                                                 )
-                                            )
-                                       ]
+                                        )
+                                    )
+                                ]
+                                (CodeGen.binOpChain
+                                    variantValuesCode.expression
+                                    CodeGen.piper
+                                    [ CodeGen.fun "variantValuesAlter"
+                                    , CodeGen.construct "variantValuesCurryTo" [ CodeGen.fun variantName ]
+                                    ]
                                 )
-                            )
 
-                    else
-                        CodeGen.construct ctorName [ CodeGen.parens (CodeGen.construct "fn" [ CodeGen.val "a0" ]) ]
+                        _ ->
+                            CodeGen.construct variantName
+                                [ CodeGen.construct "variantValuesAlter"
+                                    [ CodeGen.val ("value" |> indexed 0) ]
+                                    |> CodeGen.parens
+                                ]
                   )
-                , ( CodeGen.namedPattern "otherwise" [], CodeGen.val "otherwise" )
+                , ( CodeGen.namedPattern "notVariant" []
+                  , CodeGen.val "notVariant"
+                  )
                 ]
             )
     }
 
 
-nested : (List a -> a) -> List a -> List a
-nested toA tpls =
-    case tpls of
-        one :: two :: rest ->
-            [ toA (one :: nested toA (two :: rest)) ]
+accessors : VariantPrismGenerator
+accessors =
+    { imports = []
+    , declaration =
+        \{ variantName, type_, variantValues } ->
+            let
+                functionName =
+                    "variant" ++ variantName
+            in
+            { documentation =
+                CodeGen.emptyDocComment
+                    |> CodeGen.markdown
+                        ([ "Accessor prism for the variant `"
+                         , variantName
+                         , "` of the `type` `"
+                         , type_ |> CodeGen.prettyTypeAnnotation |> pretty 100
+                         , "`."
+                         ]
+                            |> String.concat
+                        )
+                    |> Just
+            , name = functionName
+            , annotation =
+                -- TODO: upgrade once @erlandsona figures out a `type alias Optional`
+                CodeGen.funAnn
+                    (CodeGen.typed "Relation"
+                        [ case variantValues of
+                            [] ->
+                                CodeGen.unitAnn
 
-        otherwise ->
-            otherwise
+                            top :: down ->
+                                Stack.topDown top down
+                                    |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ soFar, value ])
+                        , CodeGen.typeVar "reachable"
+                        , CodeGen.typeVar "wrap"
+                        ]
+                    )
+                    (CodeGen.typed "Relation"
+                        [ type_
+                        , CodeGen.typeVar "reachable"
+                        , CodeGen.maybeAnn (CodeGen.typeVar "wrap")
+                        ]
+                    )
+                    |> Just
+            , implementation =
+                let
+                    { access, alter } =
+                        implementation
+                            { variantName = variantName
+                            , variantValues = variantValues
+                            }
+                in
+                CodeGen.construct "makeOneToN_"
+                    [ CodeGen.string functionName
+                    , access
+                    , alter
+                    ]
+            }
+    }
+
+
+{-| How to generate a [`VariantPrismDeclaration`](#VariantPrismDeclaration) plus the necessary `import`s.
+
+Out of the box there are lenses for
+
+  - [`elm-accessors`](#accessors)
+
+You can also create a custom one with the help of [the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest):
+
+    customLens : VariantPrismGenerator
+    customLens =
+        { imports =
+            [ importStmt [ "CustomLens" ]
+                Nothing
+                (exposeExplicit
+                    [ typeOrAliasExpose "CustomLens" ]
+                    |> Just
+                )
+            ]
+        , declaration =
+            \{ variantName } ->
+                { documentation =
+                    emptyDocComment
+                        |> markdown
+                            ("`CustomLens` for the field `." ++ variantName ++ "`.")
+                        |> Just
+                , name = variantName
+                , annotation =
+                    typed "CustomLens"
+                        [ extRecordAnn "record"
+                            [ ( variantName, typeVar variantName ) ]
+                        , typeVar variantName
+                        ]
+                        |> Just
+                , implementation =
+                    let
+                        { access, set } =
+                            functionsForField variantName
+                    in
+                    fqConstruct [ "CustomLens" ] "create" [ access, at ]
+                }
+        }
+
+-}
+type alias VariantPrismGenerator =
+    { imports : List CodeGen.Import
+    , declaration :
+        { type_ : CodeGen.TypeAnnotation
+        , variantName : String
+        , variantValues : List CodeGen.TypeAnnotation
+        }
+        -> VariantPrismDeclaration
+    }
+
+
+{-| All the components to build a field lens declaration:
+
+    {-| [documentation]
+    -}
+    [name] : [annotation]
+    [name] =
+        [implementation]
+
+You can customize existing `VariantPrismDeclaration`s with [`withDocumentation`](#withDocumentation) and [`withName`](#withName)
+or create custom lens ([`functionsForField`](#functionsForField) and [`getSetRecordForField`](#getSetRecordForField) can be helpful).
+
+    customLensDeclaration { variantName } =
+        { documentation =
+            emptyDocComment
+                |> markdown
+                    ("`CustomLens` for the field `." ++ variantName ++ "`.")
+                |> Just
+        , name = variantName
+        , annotation =
+            typed "CustomLens"
+                [ extRecordAnn "record"
+                    [ ( variantName, typeVar variantName ) ]
+                , typeVar variantName
+                ]
+                |> Just
+        , implementation =
+            let
+                { access, set } =
+                    functionsForField variantName
+            in
+            fqConstruct [ "CustomLens" ] "create" [ access, at ]
+        }
+
+-}
+type alias VariantPrismDeclaration =
+    { documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
+    , name : String
+    , annotation : Maybe CodeGen.TypeAnnotation
+    , implementation : CodeGen.Expression
+    }
+
+
+{-| The provided [`VariantPrismGenerator`](#VariantPrismGenerator)s in this package have no documentation comment.
+
+You can generate your own documentation, though:
+
+    accessorsWithDocumentation { variantName } =
+        accessors { variantName = variantName }
+            |> withDocumentation
+                (emptyDocComment
+                    |> markdown
+                        ("Accessor for the variant `" ++ variantName ++ "`.")
+                )
+
+-}
+withDocumentation :
+    CodeGen.Comment CodeGen.DocComment
+    -> VariantPrismDeclaration
+    -> VariantPrismDeclaration
+withDocumentation docComment generatedFieldHelper =
+    { generatedFieldHelper
+        | documentation = docComment |> Just
+    }
+
+
+{-| Use a different name for the generated lens.
+
+    accessorsWithPrefix_v_ { variantName } =
+        accessors { variantName = variantName }
+            |> withName ("v_" ++ variantName)
+
+-}
+withName :
+    String
+    -> VariantPrismDeclaration
+    -> VariantPrismDeclaration
+withName name fieldHelperDeclaration =
+    { fieldHelperDeclaration | name = name }
