@@ -46,7 +46,7 @@ config =
     ]
 ```
 
-  - `generate`: What kind of lens to generate:
+  - `generator`: What kind of lens to generate:
       - [`elm-accessors`](#accessors),
       - [`elm-fields`](#fields),
       - [`elm-monocle`](#monocle),
@@ -99,11 +99,11 @@ rule config =
 
   - `generateIn`: The module where all field lenses will be generated in
 
-    understand `( "Module", [ "Name" ] )` as `Module.Name`
+    read `( "Module", [ "Name" ] )` as `Module.Name`
 
 -}
 type alias Config =
-    { generator : List FieldHelperGenerator
+    { generator : FieldHelperGenerator
     , generateIn : ( String, List String )
     }
 
@@ -120,7 +120,7 @@ Out of the box there are lenses for
 You can also create a custom one with the help of [the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest):
 
     customLens : FieldHelperGenerator
-    customLens  =
+    customLens =
         { imports =
             [ importStmt [ "CustomLens" ]
                 Nothing
@@ -128,6 +128,7 @@ You can also create a custom one with the help of [the-sett's elm-syntax-dsl](ht
                     [ typeOrAliasExpose "CustomLens" ]
                     |> Just
                 )
+            ]
         , declaration =
             \{ fieldName } ->
                 { documentation =
@@ -142,7 +143,7 @@ You can also create a custom one with the help of [the-sett's elm-syntax-dsl](ht
                             [ ( fieldName, typeVar fieldName ) ]
                         , typeVar fieldName
                         ]
-                    |> Just
+                        |> Just
                 , implementation =
                     let
                         { access, set } =

@@ -33,7 +33,7 @@ scoreAPoint =
                 ]
                     |> Review.Test.runOnModules
                         (rule
-                            { generator = [ accessors ]
+                            { generator = accessors
                             , generateIn = ( "Accessors", [ "Library", "Fields" ] )
                             }
                         )
@@ -78,7 +78,7 @@ scoreAPoint =
                 ]
                     |> Review.Test.runOnModules
                         (rule
-                            { generator = [ accessors ]
+                            { generator = accessors
                             , generateIn = ( "Accessors", [ "Library", "Fields" ] )
                             }
                         )
@@ -123,7 +123,7 @@ scoreAPoint =
                 ]
                     |> Review.Test.runOnModules
                         (rule
-                            { generator = [ accessors ]
+                            { generator = accessors
                             , generateIn = ( "Accessors", [ "Library", "Fields" ] )
                             }
                         )
@@ -172,7 +172,7 @@ scoreAPoint =
                 ]
                     |> Review.Test.runOnModules
                         (rule
-                            { generator = [ accessors ]
+                            { generator = accessors
                             , generateIn = ( "Accessors", [ "Library", "Fields" ] )
                             }
                         )
@@ -212,8 +212,8 @@ declarations =
     describe "kinds of declarations"
         [ test "elm-accessors"
             (\() ->
-                accessors.declaration
-                    |> printFieldHelperDeclaration { fieldName = "score" }
+                accessors.declaration { fieldName = "score" }
+                    |> printFieldHelperDeclaration
                     |> Expect.equal
                         """score : Relation score sub wrap -> Relation { record | score : score } sub wrap
 score =
@@ -221,8 +221,8 @@ score =
             )
         , test "elm-monocle"
             (\() ->
-                monocle.declaration
-                    |> printFieldHelperDeclaration { fieldName = "score" }
+                monocle.declaration { fieldName = "score" }
+                    |> printFieldHelperDeclaration
                     |> Expect.equal
                         """score : Lens { record | score : score } score
 score =
@@ -230,8 +230,8 @@ score =
             )
         , test "elm-fields"
             (\() ->
-                fields.declaration
-                    |> printFieldHelperDeclaration { fieldName = "score" }
+                fields.declaration { fieldName = "score" }
+                    |> printFieldHelperDeclaration
                     |> Expect.equal
                         """score :
     { get : { a | score : score } -> score
@@ -242,8 +242,8 @@ score =
             )
         , test "zipper"
             (\() ->
-                zipper.declaration
-                    |> printFieldHelperDeclaration { fieldName = "score" }
+                zipper.declaration { fieldName = "score" }
+                    |> printFieldHelperDeclaration
                     |> Expect.equal
                         """intoScore : Zipper { record | score : score } root -> Zipper score root
 intoScore =
@@ -292,7 +292,7 @@ scoreAPoint =
             ]
                 |> Review.Test.runOnModules
                     (rule
-                        { generator = [ accessors ]
+                        { generator = accessors
                         , generateIn = ( "Accessors", [ "Library", "Fields" ] )
                         }
                     )
