@@ -2,7 +2,7 @@
 
 ### 1.1.0
 
-Added `NoMissingVariantPrism` (by @erlandsona)
+Added `VariantPrism.GenerateUsed` (initiated by @erlandsona)
 
 #### 1.0.2
 
