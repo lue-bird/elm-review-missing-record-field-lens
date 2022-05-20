@@ -163,7 +163,7 @@ Don't [obsessively employ primitives](https://elm-radio.com/episode/primitive-ob
 The motivations for using this are similar to [`NoMissingRecordFieldLens`](#NoMissingRecordFieldLens),
 this time trying to cut down on situations where you're only interested in values of one variant.
 
-For any variant `type`, you can call `YourVariantType.Variant.oneOfThree`.
+For any variant `type`, you can call `YourVariantType.On.oneOfThree`.
 If this prism hasn't already been created, it will automatically be generated.
 
 ### try without installing
