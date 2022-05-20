@@ -17,67 +17,67 @@ import Review.Rule as Rule exposing (ContextCreator, ModuleKey, Rule)
 
 
 rule : Config -> Rule
-rule { generator, generateIn } =
+rule config =
     let
-        fieldHelperesModule =
+        { generator, generateIn } =
+            config
+
+        generationModule =
             let
                 ( head, tail ) =
                     generateIn
             in
             head :: tail
 
-        initializeModuleFromProjectContext : ContextCreator ProjectContext ModuleContext
-        initializeModuleFromProjectContext =
+        projectContextToModule : ContextCreator ProjectContext ModuleContext
+        projectContextToModule =
             Rule.initContextCreator
                 (\metadata moduleNameLookupTable _ ->
                     let
                         moduleName =
                             Rule.moduleNameFromMetadata metadata
                     in
-                    if moduleName == fieldHelperesModule then
-                        FieldHelperesModule
+                    if moduleName == generationModule then
+                        GenerationModule
                             { content = Dict.empty
                             , beforeDeclarations = { row = 1, column = 1 }
-                            , exposing_ = Node Range.emptyRange (Exposing.Explicit [])
+                            , exposing_ = Exposing.Explicit [] |> Node Range.emptyRange
                             }
 
                     else
-                        NotFieldHelperesModule
-                            { usedFieldHelperes = Dict.empty
+                        NotGenerationModule
+                            { usages = Dict.empty
                             , moduleNameLookupTable = moduleNameLookupTable
                             }
                 )
                 |> Rule.withMetadata
                 |> Rule.withModuleNameLookupTable
 
-        moduleToProjectContext : ContextCreator ModuleContext ProjectContext
-        moduleToProjectContext =
+        moduleContextToProject : ContextCreator ModuleContext ProjectContext
+        moduleContextToProject =
             Rule.initContextCreator
                 (\metadata moduleKey moduleContext ->
-                    let
-                        (Node moduleNameRange _) =
-                            Rule.moduleNameNodeFromMetadata metadata
-                    in
                     case moduleContext of
-                        FieldHelperesModule { content, beforeDeclarations, exposing_ } ->
-                            { modulesThatUseFieldHelperes = []
-                            , fieldHelperesModuleInfo =
-                                Just
-                                    { key = moduleKey
-                                    , moduleNameRange = moduleNameRange
-                                    , exposing_ = exposing_
-                                    , beforeDeclarations = beforeDeclarations
-                                    , content = content
-                                    }
+                        GenerationModule { content, beforeDeclarations, exposing_ } ->
+                            { modulesWithUsages = []
+                            , generationModuleInfo =
+                                { key = moduleKey
+                                , moduleNameRange =
+                                    Rule.moduleNameNodeFromMetadata metadata |> Node.range
+                                , exposing_ = exposing_
+                                , beforeDeclarations = beforeDeclarations
+                                , content = content
+                                }
+                                    |> Just
                             }
 
-                        NotFieldHelperesModule { usedFieldHelperes } ->
-                            { modulesThatUseFieldHelperes =
+                        NotGenerationModule { usages } ->
+                            { modulesWithUsages =
                                 [ { key = moduleKey
-                                  , usedFieldHelperes = usedFieldHelperes
+                                  , usages = usages
                                   }
                                 ]
-                            , fieldHelperesModuleInfo = Nothing
+                            , generationModuleInfo = Nothing
                             }
                 )
                 |> Rule.withMetadata
@@ -85,42 +85,53 @@ rule { generator, generateIn } =
 
         foldProjectContexts : ProjectContext -> ProjectContext -> ProjectContext
         foldProjectContexts aContext bContext =
-            { modulesThatUseFieldHelperes =
-                [ aContext.modulesThatUseFieldHelperes
-                , bContext.modulesThatUseFieldHelperes
+            { modulesWithUsages =
+                [ aContext.modulesWithUsages
+                , bContext.modulesWithUsages
                 ]
                     |> List.concat
-            , fieldHelperesModuleInfo =
+            , generationModuleInfo =
                 [ aContext, bContext ]
-                    |> List.map .fieldHelperesModuleInfo
-                    |> firstJust
+                    |> List.filterMap .generationModuleInfo
+                    |> List.head
             }
 
         initialProjectContext : ProjectContext
         initialProjectContext =
-            { modulesThatUseFieldHelperes = []
-            , fieldHelperesModuleInfo = Nothing
+            { modulesWithUsages = []
+            , generationModuleInfo = Nothing
             }
 
-        finalEvaluation : ProjectContext -> List (Rule.Error e_)
-        finalEvaluation { modulesThatUseFieldHelperes, fieldHelperesModuleInfo } =
-            modulesThatUseFieldHelperes
+        finalEvaluation : ProjectContext -> List (Rule.Error errorScope_)
+        finalEvaluation { modulesWithUsages, generationModuleInfo } =
+            modulesWithUsages
                 |> List.concatMap
-                    (\moduleThatUseFieldHelperes ->
-                        case fieldHelperesModuleInfo of
-                            Just fieldHelperesModule_ ->
-                                Dict.diff moduleThatUseFieldHelperes.usedFieldHelperes
-                                    fieldHelperesModule_.content
+                    (\moduleWithUsages ->
+                        case generationModuleInfo of
+                            Nothing ->
+                                moduleWithUsages.usages
+                                    |> Dict.values
+                                    |> List.map
+                                        (\range ->
+                                            Rule.errorForModule
+                                                moduleWithUsages.key
+                                                (generationModuleDoesntExistInfo generationModule)
+                                                range
+                                        )
+
+                            Just generationModule_ ->
+                                generationModule_.content
+                                    |> Dict.diff moduleWithUsages.usages
                                     |> Dict.keys
                                     |> List.map
                                         (\nonExistentFieldHelperName ->
                                             Rule.errorForModuleWithFix
-                                                fieldHelperesModule_.key
+                                                generationModule_.key
                                                 (nonExistentFieldHelperNameInfo nonExistentFieldHelperName)
-                                                fieldHelperesModule_.moduleNameRange
+                                                generationModule_.moduleNameRange
                                                 (let
                                                     insertLocationInDeclarations =
-                                                        fieldHelperesModule_.content
+                                                        generationModule_.content
                                                             |> Dict.toList
                                                             |> List.dropWhileRight
                                                                 (\( existing, _ ) ->
@@ -134,34 +145,25 @@ rule { generator, generateIn } =
                                                                 range.end
 
                                                             Nothing ->
-                                                                fieldHelperesModule_.beforeDeclarations
+                                                                generationModule_.beforeDeclarations
                                                         )
-                                                        (generator
-                                                            |> List.concatMap
-                                                                (\{ declaration } ->
-                                                                    [ "\n\n\n"
-                                                                    , printFieldHelperDeclaration
-                                                                        { fieldName = nonExistentFieldHelperName }
-                                                                        declaration
-                                                                    ]
-                                                                )
+                                                        ([ "\n\n\n"
+                                                         , generator.declaration { fieldName = nonExistentFieldHelperName }
+                                                            |> printFieldHelperDeclaration
+                                                         ]
                                                             |> String.concat
                                                         )
                                                    , Fix.insertAt
-                                                        (fieldHelperesModule_.exposing_
-                                                            |> Node.range
-                                                            |> .end
-                                                        )
+                                                        (generationModule_.exposing_ |> Node.range |> .end)
                                                         ([ "\n\n"
-                                                         , generator
-                                                            |> List.concatMap .imports
+                                                         , generator.imports
                                                             |> CodeGen.prettyImports
                                                             |> pretty 1000
                                                          ]
                                                             |> String.concat
                                                         )
                                                    ]
-                                                 , case fieldHelperesModule_.exposing_ of
+                                                 , case generationModule_.exposing_ of
                                                     Node { end } (Exposing.Explicit _) ->
                                                         [ Fix.insertAt
                                                             { row = end.row, column = end.column - 1 }
@@ -174,165 +176,152 @@ rule { generator, generateIn } =
                                                     |> List.concat
                                                 )
                                         )
-
-                            Nothing ->
-                                case
-                                    moduleThatUseFieldHelperes.usedFieldHelperes
-                                        |> Dict.values
-                                of
-                                    firstRange :: _ ->
-                                        [ Rule.errorForModule
-                                            moduleThatUseFieldHelperes.key
-                                            (fieldHelperesModuleDoesntExistInfo fieldHelperesModule)
-                                            firstRange
-                                        ]
-
-                                    [] ->
-                                        []
                     )
     in
     Rule.newProjectRuleSchema "NoMissingRecordFieldLens"
         initialProjectContext
         |> Rule.withModuleVisitor
-            (Rule.withModuleDefinitionVisitor
-                (\(Node moduleDefinitionRange moduleDefinition) moduleContext ->
-                    ( []
-                    , case moduleContext of
-                        FieldHelperesModule fieldHelperesModuleContext ->
-                            case moduleDefinition of
-                                NormalModule { exposingList } ->
-                                    { fieldHelperesModuleContext
-                                        | exposing_ = exposingList
-                                        , beforeDeclarations = moduleDefinitionRange.end
-                                    }
-                                        |> FieldHelperesModule
+            (\moduleVisitor ->
+                moduleVisitor
+                    |> Rule.withModuleDefinitionVisitor
+                        (\(Node moduleDefinitionRange moduleDefinition) moduleContext ->
+                            ( []
+                            , case moduleContext of
+                                GenerationModule generationModuleContext ->
+                                    case moduleDefinition of
+                                        NormalModule { exposingList } ->
+                                            { generationModuleContext
+                                                | exposing_ = exposingList
+                                                , beforeDeclarations = moduleDefinitionRange.end
+                                            }
+                                                |> GenerationModule
 
-                                _ ->
+                                        _ ->
+                                            moduleContext
+
+                                NotGenerationModule _ ->
                                     moduleContext
+                            )
+                        )
+                    |> Rule.withCommentsVisitor
+                        (\comments moduleContext ->
+                            ( []
+                            , case moduleContext of
+                                GenerationModule generationModuleContext ->
+                                    case
+                                        comments
+                                            |> List.filter
+                                                (String.startsWith "{-|" << Node.value)
+                                    of
+                                        (Node commentRange _) :: _ ->
+                                            { generationModuleContext
+                                                | beforeDeclarations = commentRange.end
+                                            }
+                                                |> GenerationModule
 
-                        NotFieldHelperesModule _ ->
-                            moduleContext
-                    )
-                )
-                >> Rule.withCommentsVisitor
-                    (\comments moduleContext ->
-                        ( []
-                        , case moduleContext of
-                            FieldHelperesModule fieldHelperesModuleContext ->
-                                case
-                                    comments
-                                        |> List.filter
-                                            (String.startsWith "{-|" << Node.value)
-                                of
-                                    (Node commentRange _) :: _ ->
-                                        { fieldHelperesModuleContext
-                                            | beforeDeclarations = commentRange.end
+                                        [] ->
+                                            moduleContext
+
+                                NotGenerationModule _ ->
+                                    moduleContext
+                            )
+                        )
+                    |> Rule.withImportVisitor
+                        (\(Node { end } _) moduleContext ->
+                            ( []
+                            , case moduleContext of
+                                GenerationModule generationModuleContext ->
+                                    let
+                                        before =
+                                            generationModuleContext.beforeDeclarations
+                                    in
+                                    if end.row > before.row then
+                                        { generationModuleContext
+                                            | beforeDeclarations = end
                                         }
-                                            |> FieldHelperesModule
+                                            |> GenerationModule
 
-                                    [] ->
+                                    else
                                         moduleContext
 
-                            NotFieldHelperesModule _ ->
-                                moduleContext
+                                NotGenerationModule _ ->
+                                    moduleContext
+                            )
                         )
-                    )
-                >> Rule.withImportVisitor
-                    (\(Node { end } _) moduleContext ->
-                        ( []
-                        , case moduleContext of
-                            FieldHelperesModule fieldHelperesModuleContext ->
-                                let
-                                    before =
-                                        fieldHelperesModuleContext.beforeDeclarations
-                                in
-                                if end.row > before.row then
-                                    { fieldHelperesModuleContext
-                                        | beforeDeclarations = end
-                                    }
-                                        |> FieldHelperesModule
+                    |> Rule.withDeclarationListVisitor
+                        (\declarations moduleContext ->
+                            ( []
+                            , case moduleContext of
+                                GenerationModule generationModuleContext ->
+                                    { generationModuleContext
+                                        | content =
+                                            declarations
+                                                |> List.filterMap
+                                                    (\(Node range declaration) ->
+                                                        case declaration of
+                                                            FunctionDeclaration fun ->
+                                                                ( fun.declaration
+                                                                    |> Node.value
+                                                                    |> .name
+                                                                    |> Node.value
+                                                                , range
+                                                                )
+                                                                    |> Just
 
-                                else
+                                                            _ ->
+                                                                Nothing
+                                                    )
+                                                |> Dict.fromList
+                                    }
+                                        |> GenerationModule
+
+                                NotGenerationModule _ ->
+                                    moduleContext
+                            )
+                        )
+                    |> Rule.withExpressionEnterVisitor
+                        (\(Node expressionRange expression) moduleContext ->
+                            ( []
+                            , case moduleContext of
+                                GenerationModule _ ->
                                     moduleContext
 
-                            NotFieldHelperesModule _ ->
-                                moduleContext
+                                NotGenerationModule notGenerationModuleContext ->
+                                    (case expression of
+                                        Expression.FunctionOrValue _ potentialFieldName ->
+                                            case
+                                                ModuleNameLookupTable.moduleNameAt
+                                                    notGenerationModuleContext.moduleNameLookupTable
+                                                    expressionRange
+                                            of
+                                                Just moduleName ->
+                                                    if moduleName == generationModule then
+                                                        let
+                                                            fieldName =
+                                                                potentialFieldName
+                                                        in
+                                                        { notGenerationModuleContext
+                                                            | usages =
+                                                                notGenerationModuleContext.usages
+                                                                    |> Dict.insert fieldName expressionRange
+                                                        }
+
+                                                    else
+                                                        notGenerationModuleContext
+
+                                                Nothing ->
+                                                    notGenerationModuleContext
+
+                                        _ ->
+                                            notGenerationModuleContext
+                                    )
+                                        |> NotGenerationModule
+                            )
                         )
-                    )
-                >> Rule.withDeclarationListVisitor
-                    (\declarations moduleContext ->
-                        ( []
-                        , case moduleContext of
-                            FieldHelperesModule fieldHelperesModuleContext ->
-                                { fieldHelperesModuleContext
-                                    | content =
-                                        declarations
-                                            |> List.filterMap
-                                                (\(Node range declaration) ->
-                                                    case declaration of
-                                                        FunctionDeclaration fun ->
-                                                            ( fun.declaration
-                                                                |> Node.value
-                                                                |> .name
-                                                                |> Node.value
-                                                            , range
-                                                            )
-                                                                |> Just
-
-                                                        _ ->
-                                                            Nothing
-                                                )
-                                            |> Dict.fromList
-                                }
-                                    |> FieldHelperesModule
-
-                            NotFieldHelperesModule _ ->
-                                moduleContext
-                        )
-                    )
-                >> Rule.withExpressionEnterVisitor
-                    (\(Node expressionRange expression) moduleContext ->
-                        ( []
-                        , case moduleContext of
-                            FieldHelperesModule _ ->
-                                moduleContext
-
-                            NotFieldHelperesModule notFieldHelperesModuleContext ->
-                                (case expression of
-                                    Expression.FunctionOrValue _ potentialFieldName ->
-                                        case
-                                            ModuleNameLookupTable.moduleNameAt
-                                                notFieldHelperesModuleContext.moduleNameLookupTable
-                                                expressionRange
-                                        of
-                                            Just moduleName ->
-                                                if moduleName == fieldHelperesModule then
-                                                    let
-                                                        fieldName =
-                                                            potentialFieldName
-                                                    in
-                                                    { notFieldHelperesModuleContext
-                                                        | usedFieldHelperes =
-                                                            notFieldHelperesModuleContext.usedFieldHelperes
-                                                                |> Dict.insert fieldName expressionRange
-                                                    }
-
-                                                else
-                                                    notFieldHelperesModuleContext
-
-                                            Nothing ->
-                                                notFieldHelperesModuleContext
-
-                                    _ ->
-                                        notFieldHelperesModuleContext
-                                )
-                                    |> NotFieldHelperesModule
-                        )
-                    )
             )
         |> Rule.withModuleContextUsingContextCreator
-            { fromProjectToModule = initializeModuleFromProjectContext
-            , fromModuleToProject = moduleToProjectContext
+            { fromProjectToModule = projectContextToModule
+            , fromModuleToProject = moduleContextToProject
             , foldProjectContexts = foldProjectContexts
             }
         |> Rule.withFinalProjectEvaluation finalEvaluation
@@ -340,12 +329,12 @@ rule { generator, generateIn } =
 
 
 type alias ProjectContext =
-    { modulesThatUseFieldHelperes :
+    { modulesWithUsages :
         List
             { key : ModuleKey
-            , usedFieldHelperes : Dict String Range
+            , usages : Dict String Range
             }
-    , fieldHelperesModuleInfo :
+    , generationModuleInfo :
         Maybe
             { key : ModuleKey
             , moduleNameRange : Range
@@ -357,13 +346,13 @@ type alias ProjectContext =
 
 
 type ModuleContext
-    = FieldHelperesModule
+    = GenerationModule
         { content : Dict String Range
         , beforeDeclarations : Location
         , exposing_ : Node Exposing
         }
-    | NotFieldHelperesModule
-        { usedFieldHelperes : Dict String Range
+    | NotGenerationModule
+        { usages : Dict String Range
         , moduleNameLookupTable : ModuleNameLookupTable
         }
 
@@ -374,17 +363,18 @@ type ModuleContext
 
 nonExistentFieldHelperNameInfo : String -> { message : String, details : List String }
 nonExistentFieldHelperNameInfo nonExistentFieldHelperName =
-    { message = "No lens for the field `." ++ nonExistentFieldHelperName ++ "` exists yet"
+    { message =
+        "lens for the field `." ++ nonExistentFieldHelperName ++ "` doesn't exists yet"
     , details = [ "Add the auto-generated lens through the fix." ]
     }
 
 
-fieldHelperesModuleDoesntExistInfo : List String -> { message : String, details : List String }
-fieldHelperesModuleDoesntExistInfo fieldHelperesModule =
-    { message = "No record field lenses module exists yet"
+generationModuleDoesntExistInfo : List String -> { message : String, details : List String }
+generationModuleDoesntExistInfo generationModule =
+    { message = "record field lenses module doesn't exists yet"
     , details =
         [ [ "Create a module \""
-          , fieldHelperesModule |> String.join "."
+          , generationModule |> String.join "."
           , ".elm\" that will contain all record field lenses."
           ]
             |> String.concat
@@ -398,7 +388,7 @@ fieldHelperesModuleDoesntExistInfo fieldHelperesModule =
 
 
 type alias Config =
-    { generator : List FieldHelperGenerator
+    { generator : FieldHelperGenerator
     , generateIn : ( String, List String )
     }
 
@@ -442,27 +432,14 @@ type alias FieldHelperDeclaration =
         )
 
 -}
-printFieldHelperDeclaration : { fieldName : String } -> ({ fieldName : String } -> FieldHelperDeclaration) -> String
-printFieldHelperDeclaration { fieldName } fieldHelperGenerator =
-    let
-        { documentation, annotation, implementation, name } =
-            fieldHelperGenerator { fieldName = fieldName }
-    in
-    CodeGen.funDecl
-        documentation
-        annotation
-        name
-        []
-        implementation
-        |> CodeGen.prettyDeclaration 100
-        |> pretty 100
-
-
-
--- utils
-
-
-firstJust : List (Maybe a) -> Maybe a
-firstJust =
-    List.filterMap identity
-        >> List.head
+printFieldHelperDeclaration : FieldHelperDeclaration -> String
+printFieldHelperDeclaration =
+    \{ documentation, annotation, implementation, name } ->
+        CodeGen.funDecl
+            documentation
+            annotation
+            name
+            []
+            implementation
+            |> CodeGen.prettyDeclaration 100
+            |> pretty 100
