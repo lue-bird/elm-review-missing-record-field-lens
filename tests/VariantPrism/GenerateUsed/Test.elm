@@ -6,7 +6,7 @@ import Parser
 import Review.Test
 import Test exposing (Test, describe, test)
 import VariantPrism.GenerateUsed exposing (accessors, rule)
-import VariantPrism.GenerateUsed.Testable exposing (generationModuleParse)
+import VariantPrism.GenerateUsed.Testable exposing (generationModuleParser)
 
 
 all : Test
@@ -16,8 +16,8 @@ all =
             Fuzz.string
             "name parser"
             (\baseModule ->
-                (baseModule ++ ".Variant")
-                    |> Parser.run generationModuleParse
+                (baseModule ++ ".On")
+                    |> Parser.run generationModuleParser
                     |> Expect.equal (Ok { baseModule = baseModule })
             )
         , describe "should generate" shouldGenerate
@@ -29,11 +29,11 @@ shouldGenerate : List Test
 shouldGenerate =
     [ test "multiple variant values, generation module exposing (..)"
         (\() ->
-            [ """module Data.Variant exposing (..)
+            [ """module Data.On exposing (..)
 """
             , """module Use exposing (..)
 
-using = Data.Variant.some
+using = Data.On.some
 
 """
             , """module Data exposing (Data(..))
@@ -47,21 +47,21 @@ type Data a b c d
                 |> Review.Test.expectErrorsForModules
                     [ ( "Use"
                       , [ Review.Test.error
-                            { message = "missing `import Data.Variant`"
+                            { message = "missing `import Data.On`"
                             , details =
                                 [ "Add the variant prism generation `module` `import` through the supplied fix" ]
-                            , under = "Data.Variant.some"
+                            , under = "Data.On.some"
                             }
                             |> Review.Test.whenFixed
                                 """module Use exposing (..)
 
-import Data.Variant
-using = Data.Variant.some
+import Data.On
+using = Data.On.some
 
 """
                         ]
                       )
-                    , ( "Data.Variant"
+                    , ( "Data.On"
                       , [ Review.Test.error
                             { message = "missing prism for variant `Some`"
                             , details =
@@ -71,7 +71,7 @@ using = Data.Variant.some
                             , under = "(..)"
                             }
                             |> Review.Test.whenFixed
-                                """module Data.Variant exposing (some)
+                                """module Data.On exposing (some)
 
 import Accessors exposing (makeOneToN_)
 import Data exposing (Data(..))
