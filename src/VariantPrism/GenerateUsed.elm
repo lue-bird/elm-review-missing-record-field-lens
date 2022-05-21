@@ -9,7 +9,7 @@ module VariantPrism.GenerateUsed exposing
 @docs rule
 
 
-# lens generators
+# prism generators
 
 
 ## working out of the box
@@ -413,18 +413,15 @@ declarationVisit declaration =
             GenerationModuleContext generationModuleContext ->
                 (case declaration of
                     Declaration.FunctionDeclaration functionDeclaration ->
-                        let
-                            variantName : String
-                            variantName =
-                                functionDeclaration.declaration
-                                    |> Node.value
-                                    |> .name
-                                    |> Node.value
-                        in
                         { generationModuleContext
                             | available =
                                 generationModuleContext.available
-                                    |> Set.insert variantName
+                                    |> Set.insert
+                                        (functionDeclaration.declaration
+                                            |> Node.value
+                                            |> .name
+                                            |> Node.value
+                                        )
                         }
 
                     _ ->
@@ -626,13 +623,21 @@ prismDeclarationCodeGen =
 
 {-| Helpers for values of a given variant in the form
 
+with
+
+    type Data a b c d
+        = Some a b c d
+        | None
+
+generates
+
 
 #### `access`
 
-    \alterValues variantType ->
+    \valuesAlter variantType ->
         case variantType of
             Some value0 value1 value2 value3 ->
-                ( value0, ( value1, ( value2, value3 ) ) ) |> alterValues |> Just
+                ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
 
             _ ->
                 Nothing
@@ -640,12 +645,12 @@ prismDeclarationCodeGen =
 
 #### `alter`
 
-    \alterValues variantType ->
+    \valuesAlter variantType ->
         case variantType of
             Some value0 value1 value2 value3 ->
                 let
                     ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                        ( value0, ( value1, ( value2, value3 ) ) ) |> alterValues
+                        ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
                 in
                 Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 
@@ -809,20 +814,20 @@ generates
     some =
         makeOneToN_
             "Data.Some"
-            (\alterValues variantType ->
+            (\valuesAlter variantType ->
                 case variantType of
                     Some value0 value1 value2 value3 ->
-                        ( value0, ( value1, ( value2, value3 ) ) ) |> alterValues |> Just
+                        ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
 
                     _ ->
                         Nothing
             )
-            (\alterValues variantType ->
+            (\valuesAlter variantType ->
                 case variantType of
                     Some value0 value1 value2 value3 ->
                         let
                             ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                                ( value0, ( value1, ( value2, value3 ) ) ) |> alterValues
+                                ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
                         in
                         Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 

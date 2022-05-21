@@ -82,20 +82,20 @@ some :
 some =
     makeOneToN_
         "Data.Some"
-        (\\alterValues variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
-                    ( value0, ( value1, ( value2, value3 ) ) ) |> alterValues |> Just
+                    ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
 
                 _ ->
                     Nothing
         )
-        (\\alterValues variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
                     let
                         ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                            ( value0, ( value1, ( value2, value3 ) ) ) |> alterValues
+                            ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
                     in
                     Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 
