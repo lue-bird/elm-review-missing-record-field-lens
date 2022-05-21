@@ -18,6 +18,9 @@ config : List Rule
 config =
     [ VariantPrism.GenerateUsed.rule
         { generator = VariantPrism.GenerateUsed.accessors
-        , generationModuleSuffix = "On"
+        , generationModuleSuffix = "Extra.Local"
+        , importGenerationModuleAs =
+            (\{ variantOriginModule } -> variantOriginModule ++ "On")
+                |> Just
         }
     ]

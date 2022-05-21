@@ -177,14 +177,17 @@ elm-review --template lue-bird/elm-review-missing-record-field-lens/example/vari
 ```elm
 module ReviewConfig exposing (config)
 
+import Review.Rule as Rule exposing (Rule)
 import VariantPrism.GenerateUsed
-import Review.Rule exposing (Rule)
 
 config : List Rule
 config =
     [ VariantPrism.GenerateUsed.rule
         { generator = VariantPrism.GenerateUsed.accessors
-        , generationModuleSuffix = "On"
+        , generationModuleSuffix = "Extra.Local"
+        , importGenerationModuleAs =
+            (\{ variantOriginModule } -> variantOriginModule ++ "On")
+                |> Just
         }
     ]
 ```

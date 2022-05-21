@@ -55,6 +55,7 @@ type Data a b c d
                     (rule
                         { generator = accessors
                         , generationModuleSuffix = "On"
+                        , importGenerationModuleAs = Nothing
                         }
                     )
                 |> Review.Test.expectErrorsForModules
@@ -136,6 +137,7 @@ type NotAVariant =
                     (rule
                         { generator = accessors
                         , generationModuleSuffix = "On"
+                        , importGenerationModuleAs = Nothing
                         }
                     )
                 |> Review.Test.expectNoErrors
@@ -168,6 +170,7 @@ variantDontError =
                     (rule
                         { generator = accessors
                         , generationModuleSuffix = "On"
+                        , importGenerationModuleAs = Nothing
                         }
                     )
                 |> Review.Test.expectNoErrors

@@ -54,16 +54,40 @@ that are called from your code but aren't already defined in a dedicated `module
     config =
         [ VariantPrism.GenerateUsed.rule
             { generator = VariantPrism.GenerateUsed.accessors
-            , generationModuleSuffix = "On"
+            , generationModuleSuffix = "Extra.Local"
+            , importGenerationModuleAs =
+                (\{ variantOriginModule } -> variantOriginModule ++ "On")
+                    |> Just
             }
         ]
 
-`generationModuleSuffix = "On"` means that prisms are generated like `YourVariantType.On.variantName`. Choose the suffix you like best:
+  - `generationModuleSuffix = "Extra.Local"`
+    → prisms are generated in the `module YourVariantType.Extra.Local`
+  - `importGenerationModuleAs = (\{ variantOriginModule } -> variantOriginModule ++ "On") |> Just`
+    → automatic `import`s of the generation `module` `as YourVariantTypeOn`
 
-  - `RemoteData.Variant.success`
-  - `RemoteData.Generated.onSuccess`
-  - `RemoteData.X.onSuccess`
+Choose what you like best:
+
+  - `import RemoteData.Generated.Variant as RemoteDataVariant`, then `RemoteDataVariant.success`?
+
+        , generationModuleSuffix = "Variant"
+        , importGenerationModuleAs = ({ variantOriginModule } -> variantOriginModule ++ "Variant") |> Just
+
+  - `RemoteData.Generated.onSuccess`?
+
+        , generationModuleSuffix = "Generated"
+        , importGenerationModuleAs = .variantOriginModule |> Just
+
+  - `import RemoteData.Extra.Local as RemoteData`, then `RemoteData.onSuccess`?
+
+        , generationModuleSuffix = "Extra.Local"
+        , importGenerationModuleAs = .variantOriginModule |> Just
+
   - `RemoteData.On.success`
+
+        , generationModuleSuffix = "On"
+        , importGenerationModuleAs = Nothing
+
   - ...
 
 
@@ -81,9 +105,10 @@ boilerplate related to updating potentially deeply nested data.
 rule :
     { generator : VariantPrismGenerator
     , generationModuleSuffix : String
+    , importGenerationModuleAs : Maybe ({ variantOriginModule : String } -> String)
     }
     -> Rule
-rule { generator, generationModuleSuffix } =
+rule { generator, generationModuleSuffix, importGenerationModuleAs } =
     Rule.newProjectRuleSchema "NoMissingVariantPrism"
         initialProjectContext
         |> Rule.withModuleVisitor
@@ -126,13 +151,14 @@ rule { generator, generationModuleSuffix } =
                     { context = context
                     , generator = generator
                     , generationModuleSuffix = generationModuleSuffix
+                    , importGenerationModuleAs = importGenerationModuleAs
                     }
             )
         |> Rule.fromProjectRuleSchema
 
 
 type alias ProjectContext =
-    { baseModules :
+    { variantOriginModules :
         Dict
             String
             { key : Rule.ModuleKey
@@ -205,7 +231,7 @@ type ModuleContext
         , importedModules : Set String
         }
     | GenerationModuleContext
-        { baseModule : String
+        { variantOriginModule : String
         , available : Set String
         , -- the location to insert exposed prisms
           exposing_ : Node Exposing
@@ -216,7 +242,7 @@ type ModuleContext
 
 initialProjectContext : ProjectContext
 initialProjectContext =
-    { baseModules = Dict.empty
+    { variantOriginModules = Dict.empty
     , useModules = Dict.empty
     , generationModules = Dict.empty
     }
@@ -233,9 +259,9 @@ projectContextToModule { generationModuleSuffix } =
                     meta |> Rule.moduleNameFromMetadata |> moduleNameToString
             in
             case moduleName |> Parser.run (beforeDotSuffixParser generationModuleSuffix) of
-                Ok baseModule ->
+                Ok variantOriginModule ->
                     GenerationModuleContext
-                        { baseModule = baseModule
+                        { variantOriginModule = variantOriginModule
                         , belowImportsColumn = 2
                         , exposing_ =
                             -- dummy. elm-review doesn't allow context change after visit
@@ -262,7 +288,7 @@ moduleContextToProject =
         (\meta moduleKey moduleContext ->
             case moduleContext of
                 GenerationModuleContext generationModuleContext ->
-                    { baseModules = Dict.empty
+                    { variantOriginModules = Dict.empty
                     , useModules = Dict.empty
                     , generationModules =
                         Dict.singleton
@@ -286,10 +312,10 @@ moduleContextToProject =
                             , uses =
                                 notGenerationModuleContext.uses
                                     |> Dict.map
-                                        (\baseModule variantsOfUsesOfBaseModule ->
-                                            { variantsOfUses = variantsOfUsesOfBaseModule
+                                        (\variantOriginModule variantsOfUsesOfVariantOriginModule ->
+                                            { variantsOfUses = variantsOfUsesOfVariantOriginModule
                                             , import_ =
-                                                if Set.member baseModule notGenerationModuleContext.importedModules then
+                                                if Set.member variantOriginModule notGenerationModuleContext.importedModules then
                                                     Present
 
                                                 else
@@ -297,7 +323,7 @@ moduleContextToProject =
                                             }
                                         )
                             }
-                    , baseModules = Dict.empty
+                    , variantOriginModules = Dict.empty
                     , generationModules = Dict.empty
                     }
         )
@@ -307,9 +333,9 @@ moduleContextToProject =
 
 projectContextsFold : ProjectContext -> ProjectContext -> ProjectContext
 projectContextsFold context0 context1 =
-    { baseModules =
-        context0.baseModules
-            |> Dict.union context1.baseModules
+    { variantOriginModules =
+        context0.variantOriginModules
+            |> Dict.union context1.variantOriginModules
     , useModules =
         context0.useModules
             |> Dict.union context1.useModules
@@ -495,10 +521,11 @@ declarationVisit declaration =
 generatePrisms :
     { generator : VariantPrismGenerator
     , generationModuleSuffix : String
+    , importGenerationModuleAs : Maybe ({ variantOriginModule : String } -> String)
     , context : ProjectContext
     }
     -> List (Rule.Error { useErrorForModule : () })
-generatePrisms { context, generator, generationModuleSuffix } =
+generatePrisms { context, generator, generationModuleSuffix, importGenerationModuleAs } =
     context.useModules
         |> Dict.values
         |> List.concatMap
@@ -506,25 +533,25 @@ generatePrisms { context, generator, generationModuleSuffix } =
                 useModule.uses
                     |> Dict.toList
                     |> List.concatMap
-                        (\( baseModuleName, usedBaseModule ) ->
-                            case context.baseModules |> Dict.get baseModuleName of
+                        (\( variantOriginModuleName, usedVariantOriginModule ) ->
+                            case context.variantOriginModules |> Dict.get variantOriginModuleName of
                                 Nothing ->
                                     []
 
-                                Just baseModule ->
+                                Just variantOriginModule ->
                                     let
                                         firstUseRange =
-                                            usedBaseModule.variantsOfUses
+                                            usedVariantOriginModule.variantsOfUses
                                                 |> Dict.values
                                                 |> List.head
                                                 -- not expected
                                                 |> Maybe.withDefault Range.emptyRange
                                     in
-                                    case context.generationModules |> Dict.get baseModuleName of
+                                    case context.generationModules |> Dict.get variantOriginModuleName of
                                         Nothing ->
                                             [ Rule.errorForModule useModule.key
                                                 { message =
-                                                    [ "missing generation `module ", baseModuleName, ".", generationModuleSuffix, "`" ]
+                                                    [ "missing generation `module ", variantOriginModuleName, ".", generationModuleSuffix, "`" ]
                                                         |> String.concat
                                                 , details =
                                                     [ "Create this elm file where variant prisms will be generated in." ]
@@ -533,21 +560,29 @@ generatePrisms { context, generator, generationModuleSuffix } =
                                             ]
 
                                         Just generationModule ->
-                                            [ case usedBaseModule.import_ of
+                                            [ case usedVariantOriginModule.import_ of
                                                 Present ->
                                                     []
 
                                                 Missing ->
                                                     [ Rule.errorForModuleWithFix useModule.key
                                                         { message =
-                                                            [ "missing `import ", baseModuleName, ".", generationModuleSuffix, "`" ]
+                                                            [ "missing `import ", variantOriginModuleName, ".", generationModuleSuffix, "`" ]
                                                                 |> String.concat
                                                         , details =
                                                             [ "Add the variant prism generation `module` `import` through the supplied fix" ]
                                                         }
                                                         firstUseRange
                                                         [ [ "\n"
-                                                          , [ CodeGen.importStmt [ baseModuleName, generationModuleSuffix ] Nothing Nothing ]
+                                                          , [ CodeGen.importStmt [ variantOriginModuleName, generationModuleSuffix ]
+                                                                (importGenerationModuleAs
+                                                                    |> Maybe.map
+                                                                        (\aliasOf ->
+                                                                            [ aliasOf { variantOriginModule = variantOriginModuleName } ]
+                                                                        )
+                                                                )
+                                                                Nothing
+                                                            ]
                                                                 |> CodeGen.prettyImports
                                                                 |> pretty 1000
                                                           ]
@@ -555,14 +590,14 @@ generatePrisms { context, generator, generationModuleSuffix } =
                                                             |> Fix.insertAt (useModule.belowImportsColumn |> onRow 1)
                                                         ]
                                                     ]
-                                            , baseModule.variantTypes
+                                            , variantOriginModule.variantTypes
                                                 |> Dict.toList
                                                 |> List.concatMap
                                                     (\( variantTypeName, variantType ) ->
                                                         variantType.variants
                                                             |> Dict.filter
                                                                 (\variantName _ ->
-                                                                    Dict.member variantName usedBaseModule.variantsOfUses
+                                                                    Dict.member variantName usedVariantOriginModule.variantsOfUses
                                                                 )
                                                             |> Dict.toList
                                                             |> List.map
@@ -570,7 +605,7 @@ generatePrisms { context, generator, generationModuleSuffix } =
                                                                     let
                                                                         generated =
                                                                             generator
-                                                                                { variantModule = baseModuleName
+                                                                                { variantModule = variantOriginModuleName
                                                                                 , typeName = variantTypeName
                                                                                 , typeParameters = variantType.parameters
                                                                                 , variantName = variantName
@@ -613,7 +648,7 @@ generatePrisms { context, generator, generationModuleSuffix } =
                                                                         , [ "\n"
                                                                           , generated.imports
                                                                                 |> (::)
-                                                                                    (CodeGen.importStmt [ baseModuleName ]
+                                                                                    (CodeGen.importStmt [ variantOriginModuleName ]
                                                                                         Nothing
                                                                                         ([ CodeGen.openTypeExpose variantTypeName ]
                                                                                             |> CodeGen.exposeExplicit
