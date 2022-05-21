@@ -1,5 +1,8 @@
 module VariantPrism.GenerateUsed exposing
     ( rule
+    , Config(..)
+    , inVariantOriginModuleDotSuffix
+    , importGenerationModuleAs, importGenerationModuleWithoutAlias
     , accessors
     , VariantPrismGenerator, VariantPrismDeclaration, implementation, withDocumentation, withName
     )
@@ -9,15 +12,22 @@ module VariantPrism.GenerateUsed exposing
 @docs rule
 
 
-# prism generators
+# config
+
+@docs Config
+@docs inVariantOriginModuleDotSuffix
+@docs importGenerationModuleAs, importGenerationModuleWithoutAlias
 
 
-## working out of the box
+## generators
+
+
+### working out of the box
 
 @docs accessors
 
 
-## custom
+### custom
 
 @docs VariantPrismGenerator, VariantPrismDeclaration, implementation, withDocumentation, withName
 
@@ -52,43 +62,14 @@ that are called from your code but aren't already defined in a dedicated `module
 
     config : List Rule
     config =
-        [ VariantPrism.GenerateUsed.rule
-            { generator = VariantPrism.GenerateUsed.accessors
-            , generationModuleSuffix = "Extra.Local"
-            , importGenerationModuleAs =
-                (\{ variantOriginModule } -> variantOriginModule ++ "On")
-                    |> Just
-            }
+        [ VariantPrism.GenerateUsed.accessors
+            |> VariantPrism.inVariantOriginModuleDotSuffix "Extra.Local"
+            |> VariantPrism.importGenerationModuleAs
+                (\{ originModule } -> originModule ++ "On")
+            |> VariantPrism.GenerateUsed.rule
         ]
 
-  - `generationModuleSuffix = "Extra.Local"`
-    → prisms are generated in the `module YourVariantType.Extra.Local`
-  - `importGenerationModuleAs = (\{ variantOriginModule } -> variantOriginModule ++ "On") |> Just`
-    → automatic `import`s of the generation `module` `as YourVariantTypeOn`
-
-Choose what you like best:
-
-  - `import RemoteData.Generated.Variant as RemoteDataVariant`, then `RemoteDataVariant.success`?
-
-        , generationModuleSuffix = "Variant"
-        , importGenerationModuleAs = ({ variantOriginModule } -> variantOriginModule ++ "Variant") |> Just
-
-  - `RemoteData.Generated.onSuccess`?
-
-        , generationModuleSuffix = "Generated"
-        , importGenerationModuleAs = .variantOriginModule |> Just
-
-  - `import RemoteData.Extra.Local as RemoteData`, then `RemoteData.onSuccess`?
-
-        , generationModuleSuffix = "Extra.Local"
-        , importGenerationModuleAs = .variantOriginModule |> Just
-
-  - `RemoteData.On.success`
-
-        , generationModuleSuffix = "On"
-        , importGenerationModuleAs = Nothing
-
-  - ...
+**Check out [`Config`](#Config)!**
 
 
 ## use it
@@ -102,13 +83,12 @@ boilerplate related to updating potentially deeply nested data.
 ... when you consider lenses the less readable/intuitive/simple/explicit alternative.
 
 -}
-rule :
-    { generator : VariantPrismGenerator
-    , generationModuleSuffix : String
-    , importGenerationModuleAs : Maybe ({ variantOriginModule : String } -> String)
-    }
-    -> Rule
-rule { generator, generationModuleSuffix, importGenerationModuleAs } =
+rule : Config -> Rule
+rule config =
+    let
+        (Config { generator, generationModuleSuffix, generationModuleImportAlias }) =
+            config
+    in
     Rule.newProjectRuleSchema "NoMissingVariantPrism"
         initialProjectContext
         |> Rule.withModuleVisitor
@@ -151,7 +131,7 @@ rule { generator, generationModuleSuffix, importGenerationModuleAs } =
                     { context = context
                     , generator = generator
                     , generationModuleSuffix = generationModuleSuffix
-                    , importGenerationModuleAs = importGenerationModuleAs
+                    , generationModuleImportAlias = generationModuleImportAlias
                     }
             )
         |> Rule.fromProjectRuleSchema
@@ -231,7 +211,7 @@ type ModuleContext
         , importedModules : Set String
         }
     | GenerationModuleContext
-        { variantOriginModule : String
+        { originModule : String
         , available : Set String
         , -- the location to insert exposed prisms
           exposing_ : Node Exposing
@@ -259,9 +239,9 @@ projectContextToModule { generationModuleSuffix } =
                     meta |> Rule.moduleNameFromMetadata |> moduleNameToString
             in
             case moduleName |> Parser.run (beforeDotSuffixParser generationModuleSuffix) of
-                Ok variantOriginModule ->
+                Ok originModule ->
                     GenerationModuleContext
-                        { variantOriginModule = variantOriginModule
+                        { originModule = originModule
                         , belowImportsColumn = 2
                         , exposing_ =
                             -- dummy. elm-review doesn't allow context change after visit
@@ -312,10 +292,10 @@ moduleContextToProject =
                             , uses =
                                 notGenerationModuleContext.uses
                                     |> Dict.map
-                                        (\variantOriginModule variantsOfUsesOfVariantOriginModule ->
+                                        (\originModule variantsOfUsesOfVariantOriginModule ->
                                             { variantsOfUses = variantsOfUsesOfVariantOriginModule
                                             , import_ =
-                                                if Set.member variantOriginModule notGenerationModuleContext.importedModules then
+                                                if Set.member originModule notGenerationModuleContext.importedModules then
                                                     Present
 
                                                 else
@@ -521,11 +501,11 @@ declarationVisit declaration =
 generatePrisms :
     { generator : VariantPrismGenerator
     , generationModuleSuffix : String
-    , importGenerationModuleAs : Maybe ({ variantOriginModule : String } -> String)
+    , generationModuleImportAlias : Maybe ({ originModule : String } -> String)
     , context : ProjectContext
     }
     -> List (Rule.Error { useErrorForModule : () })
-generatePrisms { context, generator, generationModuleSuffix, importGenerationModuleAs } =
+generatePrisms { context, generator, generationModuleSuffix, generationModuleImportAlias } =
     context.useModules
         |> Dict.values
         |> List.concatMap
@@ -538,7 +518,7 @@ generatePrisms { context, generator, generationModuleSuffix, importGenerationMod
                                 Nothing ->
                                     []
 
-                                Just variantOriginModule ->
+                                Just originModule ->
                                     let
                                         firstUseRange =
                                             usedVariantOriginModule.variantsOfUses
@@ -575,10 +555,10 @@ generatePrisms { context, generator, generationModuleSuffix, importGenerationMod
                                                         firstUseRange
                                                         [ [ "\n"
                                                           , [ CodeGen.importStmt [ variantOriginModuleName, generationModuleSuffix ]
-                                                                (importGenerationModuleAs
+                                                                (generationModuleImportAlias
                                                                     |> Maybe.map
                                                                         (\aliasOf ->
-                                                                            [ aliasOf { variantOriginModule = variantOriginModuleName } ]
+                                                                            [ aliasOf { originModule = variantOriginModuleName } ]
                                                                         )
                                                                 )
                                                                 Nothing
@@ -590,7 +570,7 @@ generatePrisms { context, generator, generationModuleSuffix, importGenerationMod
                                                             |> Fix.insertAt (useModule.belowImportsColumn |> onRow 1)
                                                         ]
                                                     ]
-                                            , variantOriginModule.variantTypes
+                                            , originModule.variantTypes
                                                 |> Dict.toList
                                                 |> List.concatMap
                                                     (\( variantTypeName, variantType ) ->
@@ -682,6 +662,83 @@ prismDeclarationCodeGen =
 
 
 -- config
+
+
+{-| How to generate, where to generate, how to import.
+
+    import VariantPrism.GenerateUsed
+
+    VariantPrism.GenerateUsed.accessors
+        |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
+            "Extra.Local"
+        |> VariantPrism.GenerateUsed.importGenerationModuleAs
+            (\{ originModule } -> originModule ++ "On")
+        |> VariantPrism.GenerateUsed.rule
+
+  - [`inVariantOriginModuleDotSuffix "Extra.Local"`](#inVariantOriginModuleDotSuffix)
+    → prisms are generated in the `module YourVariantOriginModule.Extra.Local`
+  - [`importGenerationModuleAs (\{ originModule } -> originModule ++ "On")`](#importGenerationModuleAs)
+    → automatic `import`s of the generation `module` `as YourVariantOriginModuleOn`
+
+Choose what you like best:
+
+  - `import RemoteData.Variant.Generated as RemoteDataVariant`, then `RemoteDataVariant.success`?
+
+        inVariantOriginModuleDotSuffix "Variant.Generated"
+            |> importGenerationModuleAs
+                ({ originModule } -> originModule ++ "Variant")
+
+  - `RemoteData.Generated.onSuccess`?
+
+        inVariantOriginModuleDotSuffix "Generated"
+            |> importGenerationModuleAs .originModule
+
+  - `RemoteData.On.success`
+
+        inVariantOriginModuleDotSuffix "On"
+
+  - ...
+
+-}
+type Config
+    = Config
+        { generator : VariantPrismGenerator
+        , generationModuleSuffix : String
+        , generationModuleImportAlias : Maybe ({ originModule : String } -> String)
+        }
+
+
+{-| You can optionally configure aliases when `import`ing automatically using [importGenerationModuleAs](#importGenerationModuleAs).
+-}
+inVariantOriginModuleDotSuffix : String -> VariantPrismGenerator -> Config
+inVariantOriginModuleDotSuffix generationModuleSuffix =
+    \generator ->
+        { generator = generator
+        , generationModuleSuffix = generationModuleSuffix
+        , generationModuleImportAlias = Nothing
+        }
+            |> Config
+
+
+importGenerationModuleAs : ({ originModule : String } -> String) -> Config -> Config
+importGenerationModuleAs generationModuleImportAlias =
+    \(Config config) ->
+        { config
+            | generationModuleImportAlias =
+                generationModuleImportAlias |> Just
+        }
+            |> Config
+
+
+{-| Drop potential configured aliases when `import`ing automatically.
+-}
+importGenerationModuleWithoutAlias : Config -> Config
+importGenerationModuleWithoutAlias =
+    \(Config config) ->
+        { config
+            | generationModuleImportAlias = Nothing
+        }
+            |> Config
 
 
 {-| Helpers for values of a given variant in the form

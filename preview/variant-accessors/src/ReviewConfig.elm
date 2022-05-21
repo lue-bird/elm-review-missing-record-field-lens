@@ -16,11 +16,10 @@ import VariantPrism.GenerateUsed
 
 config : List Rule
 config =
-    [ VariantPrism.GenerateUsed.rule
-        { generator = VariantPrism.GenerateUsed.accessors
-        , generationModuleSuffix = "Extra.Local"
-        , importGenerationModuleAs =
-            (\{ variantOriginModule } -> variantOriginModule ++ "On")
-                |> Just
-        }
+    [ VariantPrism.GenerateUsed.accessors
+        |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
+            "Extra.Local"
+        |> VariantPrism.GenerateUsed.importGenerationModuleAs
+            (\{ originModule } -> originModule ++ "On")
+        |> VariantPrism.GenerateUsed.rule
     ]

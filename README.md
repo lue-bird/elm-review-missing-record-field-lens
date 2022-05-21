@@ -182,16 +182,15 @@ import VariantPrism.GenerateUsed
 
 config : List Rule
 config =
-    [ VariantPrism.GenerateUsed.rule
-        { generator = VariantPrism.GenerateUsed.accessors
-        , generationModuleSuffix = "Extra.Local"
-        , importGenerationModuleAs =
-            (\{ variantOriginModule } -> variantOriginModule ++ "On")
-                |> Just
-        }
+    [ VariantPrism.GenerateUsed.accessors
+        |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
+            "Extra.Local"
+        |> VariantPrism.GenerateUsed.importGenerationModuleAs
+            (\{ originModule } -> originModule ++ "On")
+        |> VariantPrism.GenerateUsed.rule
     ]
 ```
-See [`Config`](VariantPrism-GenerateUsed#Config)
+**Check out [`Config`](VariantPrism-GenerateUsed#Config)!**
 
 ### prisms that work out of the box
 
