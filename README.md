@@ -136,8 +136,6 @@ Structuring a model like
 { player : { position : ..., speed : ... }
 , scene : { trees : ..., rocks : ... }
 }
-
-
 ```
 is a smelly pattern. It makes it unnecessarily hard to update inner fields.
 ```elm
@@ -151,10 +149,15 @@ Doesn't this make ui harder? Yes, but the extra explicitness is worth it.
 `player` could have things that are irrelevant to the ui like `configuredControls` etc.
 It's best to keep state structure and ui requirements separate.
 
+Similarly, leaning towards a more limited, domain tailored API of types, packages, ... with strong boundaries
+will lead to easier code with stronger guarantees.
+Don't try to design your API around lenses.
+Only if the API interaction happens to mirror that behavior, Dōzo!
+
 ### when is nesting acceptable?
 
 When parts are logically connected like an `Address` or a [`Camera`](https://package.elm-lang.org/packages/ianmackenzie/elm-3d-camera/latest).
-Make sure to make types out of these.
+Make sure to make types, packages, ... out of these.
 Don't [obsessively employ primitives](https://elm-radio.com/episode/primitive-obsession/).
 
 
@@ -185,8 +188,7 @@ config =
     [ VariantPrism.GenerateUsed.accessors
         |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
             "Extra.Local"
-        |> VariantPrism.GenerateUsed.importGenerationModuleAs
-            (\{ originModule } -> originModule ++ "On")
+        |> VariantPrism.GenerateUsed.importGenerationModuleAs .originModule
         |> VariantPrism.GenerateUsed.rule
     ]
 ```
