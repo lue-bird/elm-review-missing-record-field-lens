@@ -41,20 +41,30 @@ import Review.ModuleNameLookupTable as ModuleNameLookupTable exposing (ModuleNam
 import Review.Rule as Rule exposing (Rule)
 import Set exposing (Set)
 import Stack
-import VariantPrism.GenerateUsed.Testable exposing (generationModuleParser)
+import VariantPrism.GenerateUsed.Testable exposing (beforeDotSuffixParser)
 
 
-{-| Generate `elm-accessors` based Prisms for
-custom Types that don't already have one defined.
+{-| Generate prisms for variant `type`s
+that are called from your code but aren't already defined in a dedicated `module`.
 
-Because functions in elm can't start with a capitol letter OR an underscore `_`
-The prefix `variant` is used as a way to namespace the generated code.
+    import Review.Rule as Rule exposing (Rule)
+    import VariantPrism.GenerateUsed
 
+    config : List Rule
     config =
-        [ NoMissingVariantPrism.rule
+        [ VariantPrism.GenerateUsed.rule
+            { generator = VariantPrism.GenerateUsed.accessors
+            , generationModuleSuffix = "On"
+            }
         ]
 
-see the `tests/` for examples of the sort of code that's generated.
+`generationModuleSuffix = "On"` means that prisms are generated like `YourVariantType.On.variantName`. Choose the suffix you like best:
+
+  - `RemoteData.Variant.success`
+  - `RemoteData.Generated.onSuccess`
+  - `RemoteData.X.onSuccess`
+  - `RemoteData.On.success`
+  - ...
 
 
 ## use it
@@ -68,8 +78,12 @@ boilerplate related to updating potentially deeply nested data.
 ... when you consider lenses the less readable/intuitive/simple/explicit alternative.
 
 -}
-rule : { generator : VariantPrismGenerator } -> Rule
-rule { generator } =
+rule :
+    { generator : VariantPrismGenerator
+    , generationModuleSuffix : String
+    }
+    -> Rule
+rule { generator, generationModuleSuffix } =
     Rule.newProjectRuleSchema "NoMissingVariantPrism"
         initialProjectContext
         |> Rule.withModuleVisitor
@@ -101,13 +115,18 @@ rule { generator } =
                         )
             )
         |> Rule.withModuleContextUsingContextCreator
-            { fromProjectToModule = projectContextToModule
+            { fromProjectToModule =
+                projectContextToModule { generationModuleSuffix = generationModuleSuffix }
             , fromModuleToProject = moduleContextToProject
             , foldProjectContexts = projectContextsFold
             }
         |> Rule.withFinalProjectEvaluation
             (\context ->
-                generatePrisms { context = context, generator = generator }
+                generatePrisms
+                    { context = context
+                    , generator = generator
+                    , generationModuleSuffix = generationModuleSuffix
+                    }
             )
         |> Rule.fromProjectRuleSchema
 
@@ -136,7 +155,7 @@ type alias ProjectContext =
             , belowImportsColumn : Int
             , uses :
                 Dict
-                    -- by base module without the `.On` suffix
+                    -- by base module without the generationModuleSuffix
                     String
                     { import_ : Presence
                     , variantsOfUses : Dict String Range
@@ -144,7 +163,7 @@ type alias ProjectContext =
             }
     , generationModules :
         Dict
-            -- by base module without the `.On` suffix
+            -- by base module without the generationModuleSuffix
             String
             { -- the location to insert exposed prisms
               exposing_ : Node Exposing
@@ -166,7 +185,7 @@ type ModuleContext
         { moduleOriginLookup : ModuleNameLookupTable
         , uses :
             Dict
-                -- by base module without the `.On` suffix
+                -- by base module without the generationModuleSuffix
                 String
                 (Dict String Range)
         , variantTypes :
@@ -203,18 +222,20 @@ initialProjectContext =
     }
 
 
-projectContextToModule : Rule.ContextCreator ProjectContext ModuleContext
-projectContextToModule =
+projectContextToModule :
+    { generationModuleSuffix : String }
+    -> Rule.ContextCreator ProjectContext ModuleContext
+projectContextToModule { generationModuleSuffix } =
     Rule.initContextCreator
         (\meta moduleOriginLookup _ ->
             let
                 moduleName =
                     meta |> Rule.moduleNameFromMetadata |> moduleNameToString
             in
-            case moduleName |> Parser.run generationModuleParser of
-                Ok generation ->
+            case moduleName |> Parser.run (beforeDotSuffixParser generationModuleSuffix) of
+                Ok baseModule ->
                     GenerationModuleContext
-                        { baseModule = generation.baseModule
+                        { baseModule = baseModule
                         , belowImportsColumn = 2
                         , exposing_ =
                             -- dummy. elm-review doesn't allow context change after visit
@@ -472,9 +493,12 @@ declarationVisit declaration =
 
 
 generatePrisms :
-    { generator : VariantPrismGenerator, context : ProjectContext }
+    { generator : VariantPrismGenerator
+    , generationModuleSuffix : String
+    , context : ProjectContext
+    }
     -> List (Rule.Error { useErrorForModule : () })
-generatePrisms { context, generator } =
+generatePrisms { context, generator, generationModuleSuffix } =
     context.useModules
         |> Dict.values
         |> List.concatMap
@@ -500,7 +524,7 @@ generatePrisms { context, generator } =
                                         Nothing ->
                                             [ Rule.errorForModule useModule.key
                                                 { message =
-                                                    [ "missing generation `module ", baseModuleName, ".On`" ]
+                                                    [ "missing generation `module ", baseModuleName, ".", generationModuleSuffix, "`" ]
                                                         |> String.concat
                                                 , details =
                                                     [ "Create this elm file where variant prisms will be generated in." ]
@@ -516,14 +540,14 @@ generatePrisms { context, generator } =
                                                 Missing ->
                                                     [ Rule.errorForModuleWithFix useModule.key
                                                         { message =
-                                                            [ "missing `import ", baseModuleName, ".On`" ]
+                                                            [ "missing `import ", baseModuleName, ".", generationModuleSuffix, "`" ]
                                                                 |> String.concat
                                                         , details =
                                                             [ "Add the variant prism generation `module` `import` through the supplied fix" ]
                                                         }
                                                         firstUseRange
                                                         [ [ "\n"
-                                                          , [ CodeGen.importStmt [ baseModuleName, "On" ] Nothing Nothing ]
+                                                          , [ CodeGen.importStmt [ baseModuleName, generationModuleSuffix ] Nothing Nothing ]
                                                                 |> CodeGen.prettyImports
                                                                 |> pretty 1000
                                                           ]
@@ -619,6 +643,10 @@ prismDeclarationCodeGen =
             (prismDeclaration.name |> char0ToLower)
             []
             prismDeclaration.implementation
+
+
+
+-- config
 
 
 {-| Helpers for values of a given variant in the form
@@ -793,7 +821,7 @@ implementation { variantName, variantValues } =
 
 {-| Named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/) which
 
-with
+with `generationModuleSuffix = "On"` and
 
     module Data exposing (Data(..))
 

@@ -6,19 +6,27 @@ import Parser
 import Review.Test
 import Test exposing (Test, describe, test)
 import VariantPrism.GenerateUsed exposing (accessors, rule)
-import VariantPrism.GenerateUsed.Testable exposing (generationModuleParser)
+import VariantPrism.GenerateUsed.Testable exposing (beforeDotSuffixParser)
 
 
 all : Test
 all =
     describe "NoMissingVariantPrism"
         [ Test.fuzz
-            Fuzz.string
+            (Fuzz.constant
+                (\baseModule generationModuleSuffix ->
+                    { baseModule = baseModule
+                    , generationModuleSuffix = generationModuleSuffix
+                    }
+                )
+                |> Fuzz.andMap Fuzz.string
+                |> Fuzz.andMap Fuzz.string
+            )
             "name parser"
-            (\baseModule ->
-                (baseModule ++ ".On")
-                    |> Parser.run generationModuleParser
-                    |> Expect.equal (Ok { baseModule = baseModule })
+            (\{ baseModule, generationModuleSuffix } ->
+                (baseModule ++ "." ++ generationModuleSuffix)
+                    |> Parser.run (beforeDotSuffixParser generationModuleSuffix)
+                    |> Expect.equal (Ok baseModule)
             )
         , describe "should generate" shouldGenerate
         , describe "should not generate" dontGenerate
@@ -43,7 +51,12 @@ type Data a b c d
     | None
 """
             ]
-                |> Review.Test.runOnModules (rule { generator = accessors })
+                |> Review.Test.runOnModules
+                    (rule
+                        { generator = accessors
+                        , generationModuleSuffix = "On"
+                        }
+                    )
                 |> Review.Test.expectErrorsForModules
                     [ ( "Use"
                       , [ Review.Test.error
@@ -119,7 +132,12 @@ dontGenerate =
 type NotAVariant =
     NotAVariant String
 """
-                |> Review.Test.run (rule { generator = accessors })
+                |> Review.Test.run
+                    (rule
+                        { generator = accessors
+                        , generationModuleSuffix = "On"
+                        }
+                    )
                 |> Review.Test.expectNoErrors
         )
     , test "generate Prism for variants that already have a prism defined."
@@ -146,7 +164,12 @@ variantDontError =
 
 
 """
-                |> Review.Test.run (rule { generator = accessors })
+                |> Review.Test.run
+                    (rule
+                        { generator = accessors
+                        , generationModuleSuffix = "On"
+                        }
+                    )
                 |> Review.Test.expectNoErrors
         )
     ]

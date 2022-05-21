@@ -183,7 +183,9 @@ import Review.Rule exposing (Rule)
 config : List Rule
 config =
     [ VariantPrism.GenerateUsed.rule
-        VariantPrism.GenerateUsed.accessors
+        { generator = VariantPrism.GenerateUsed.accessors
+        , generationModuleSuffix = "On"
+        }
     ]
 ```
 See [`Config`](VariantPrism-GenerateUsed#Config)

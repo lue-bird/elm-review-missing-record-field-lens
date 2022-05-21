@@ -1,11 +1,9 @@
-module VariantPrism.GenerateUsed.Testable exposing (generationModuleParser)
+module VariantPrism.GenerateUsed.Testable exposing (beforeDotSuffixParser)
 
-import Parser exposing ((|=), Parser)
+import Parser exposing (Parser)
 
 
-generationModuleParser : Parser { baseModule : String }
-generationModuleParser =
-    Parser.succeed (\baseModule -> { baseModule = baseModule })
-        |= (Parser.chompUntil ".On"
-                |> Parser.getChompedString
-           )
+beforeDotSuffixParser : String -> Parser String
+beforeDotSuffixParser suffix =
+    Parser.chompUntil ("." ++ suffix)
+        |> Parser.getChompedString

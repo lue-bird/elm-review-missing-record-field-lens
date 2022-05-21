@@ -17,5 +17,7 @@ import VariantPrism.GenerateUsed
 config : List Rule
 config =
     [ VariantPrism.GenerateUsed.rule
-        VariantPrism.GenerateUsed.accessors
+        { generator = VariantPrism.GenerateUsed.accessors
+        , generationModuleSuffix = "On"
+        }
     ]
