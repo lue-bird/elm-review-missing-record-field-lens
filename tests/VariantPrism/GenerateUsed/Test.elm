@@ -22,9 +22,9 @@ all =
                 |> Fuzz.andMap Fuzz.string
                 |> Fuzz.andMap Fuzz.string
             )
-            "name parser"
+            "beforeSuffixParser"
             (\{ baseModule, generationModuleSuffix } ->
-                (baseModule ++ "." ++ generationModuleSuffix)
+                (baseModule ++ generationModuleSuffix)
                     |> Parser.run (beforeSuffixParser generationModuleSuffix)
                     |> Expect.equal (Ok baseModule)
             )
@@ -40,9 +40,9 @@ generates =
             (\() ->
                 [ """module Data.Extra.Local exposing (..)
 """
-                , """module Use exposing (..)
+                , """module Use exposing (use)
 
-using = Data.onSome
+use = Data.onSome
 
 """
                 , """module Data exposing (Data(..))
@@ -68,10 +68,10 @@ type Data a b c d
                                 , under = "Data.onSome"
                                 }
                                 |> Review.Test.whenFixed
-                                    """module Use exposing (..)
+                                    """module Use exposing (use)
 
 import Data.Extra.Local as Data
-using = Data.onSome
+use = Data.onSome
 
 """
                             ]
@@ -129,12 +129,12 @@ dontGenerate =
     describe "doesn't generate"
         [ test "attempt to fix Lens-able types"
             (\() ->
-                [ """module Data exposing (..)
+                [ """module Data exposing (One (..))
 
 type One
     = One String
 """
-                , """module Use
+                , """module Use exposing (use)
 
 use = Data.onOne
 """
@@ -150,7 +150,7 @@ use = Data.onOne
             )
         , test "generate Prism for variants that already have a prism defined."
             (\() ->
-                [ """module Data exposing (..)
+                [ """module Data exposing (AlreadyDefined(..))
 
 type AlreadyDefined a
     = DontError a
@@ -159,7 +159,7 @@ type AlreadyDefined a
 variantDontError : Prism (AlreadyDefined a) a
 variantDontError = ()
 """
-                , """module Use
+                , """module Use exposing (use)
 
 use = Data.onOne
 """
