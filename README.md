@@ -188,7 +188,7 @@ config =
     [ VariantPrism.GenerateUsed.accessors
         |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
             "Extra.Local"
-        |> VariantPrism.GenerateUsed.importGenerationModuleAs .originModule
+        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
         |> VariantPrism.GenerateUsed.rule
     ]
 ```

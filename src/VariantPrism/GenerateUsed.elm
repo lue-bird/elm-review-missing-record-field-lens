@@ -2,9 +2,9 @@ module VariantPrism.GenerateUsed exposing
     ( rule
     , Config(..)
     , inVariantOriginModuleDotSuffix
-    , importGenerationModuleAs, importGenerationModuleWithoutAlias
+    , importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleWithoutAlias
     , accessors
-    , VariantPrismGenerator, VariantPrismDeclaration, implementation, withDocumentation, withName
+    , VariantPrismGenerator, VariantPrismDeclaration, implementation, withDocumentation, withName, prismNameOnVariantParser
     )
 
 {-|
@@ -16,7 +16,7 @@ module VariantPrism.GenerateUsed exposing
 
 @docs Config
 @docs inVariantOriginModuleDotSuffix
-@docs importGenerationModuleAs, importGenerationModuleWithoutAlias
+@docs importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleWithoutAlias
 
 
 ## generators
@@ -29,12 +29,13 @@ module VariantPrism.GenerateUsed exposing
 
 ### custom
 
-@docs VariantPrismGenerator, VariantPrismDeclaration, implementation, withDocumentation, withName
+@docs VariantPrismGenerator, VariantPrismDeclaration, implementation, withDocumentation, withName, prismNameOnVariantParser
 
 -}
 
 import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
+import Elm.Docs as Meta
 import Elm.Pretty as CodeGen
 import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Exposing as Exposing exposing (Exposing)
@@ -43,15 +44,16 @@ import Elm.Syntax.Import exposing (Import)
 import Elm.Syntax.Module as Module exposing (Module)
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Range)
-import Help exposing (char0ToLower, indexed, moduleNameToString, onRow)
-import Parser
+import Help exposing (char0ToLower, indexed, metaToVariantType, moduleNameToString, onRow)
+import Parser exposing ((|.), (|=), Parser)
 import Pretty exposing (pretty)
 import Review.Fix as Fix
 import Review.ModuleNameLookupTable as ModuleNameLookupTable exposing (ModuleNameLookupTable)
+import Review.Project.Dependency as Dependency
 import Review.Rule as Rule exposing (Rule)
 import Set exposing (Set)
 import Stack
-import VariantPrism.GenerateUsed.Testable exposing (beforeDotSuffixParser)
+import VariantPrism.GenerateUsed.Testable exposing (beforeSuffixParser)
 
 
 {-| Generate prisms for variant `type`s
@@ -63,9 +65,9 @@ that are called from your code but aren't already defined in a dedicated `module
     config : List Rule
     config =
         [ VariantPrism.GenerateUsed.accessors
-            |> VariantPrism.inVariantOriginModuleDotSuffix "Extra.Local"
-            |> VariantPrism.importGenerationModuleAs
-                (\{ originModule } -> originModule ++ "On")
+            |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
+                "Extra.Local"
+            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
             |> VariantPrism.GenerateUsed.rule
         ]
 
@@ -86,11 +88,24 @@ boilerplate related to updating potentially deeply nested data.
 rule : Config -> Rule
 rule config =
     let
-        (Config { generator, generationModuleSuffix, generationModuleImportAlias }) =
+        (Config { generator, generationModuleSuffix, generationModuleImportAliasOriginModuleSuffix }) =
             config
     in
-    Rule.newProjectRuleSchema "NoMissingVariantPrism"
+    Rule.newProjectRuleSchema
+        "NoMissingVariantPrism"
         initialProjectContext
+        |> Rule.withDependenciesProjectVisitor
+            (\dependencies context ->
+                ( []
+                , let
+                    modules =
+                        dependencies
+                            |> Dict.values
+                            |> List.concatMap Dependency.modules
+                  in
+                  context |> dependencyModulesVisit modules
+                )
+            )
         |> Rule.withModuleVisitor
             (\moduleSchema ->
                 moduleSchema
@@ -109,7 +124,14 @@ rule config =
                     |> Rule.withExpressionEnterVisitor
                         (\expressionNode context ->
                             ( []
-                            , context |> expressionVisit expressionNode
+                            , context
+                                |> expressionVisit
+                                    { nameParser = generator.nameParser
+                                    , generationModuleSuffix = generationModuleSuffix
+                                    , maybeGenerationModuleImportAliasModuleOriginParser =
+                                        generationModuleImportAliasOriginModuleSuffix
+                                    , expressionNode = expressionNode
+                                    }
                             )
                         )
                     |> Rule.withDeclarationEnterVisitor
@@ -131,29 +153,27 @@ rule config =
                     { context = context
                     , generator = generator
                     , generationModuleSuffix = generationModuleSuffix
-                    , generationModuleImportAlias = generationModuleImportAlias
+                    , generationModuleImportAliasOriginModuleSuffix =
+                        generationModuleImportAliasOriginModuleSuffix
                     }
             )
         |> Rule.fromProjectRuleSchema
 
 
 type alias ProjectContext =
-    { variantOriginModules :
+    { variantTypes :
         Dict
+            -- by `module` name
             String
-            { key : Rule.ModuleKey
-            , variantTypes :
-                Dict
-                    String
-                    { variants :
-                        Dict
-                            String
-                            { range : Range
-                            , values : List CodeGen.TypeAnnotation
-                            }
-                    , parameters : List String
-                    }
-            }
+            (Dict
+                String
+                { variants :
+                    Dict
+                        String
+                        (List CodeGen.TypeAnnotation)
+                , parameters : List String
+                }
+            )
     , useModules :
         Dict
             String
@@ -222,7 +242,7 @@ type ModuleContext
 
 initialProjectContext : ProjectContext
 initialProjectContext =
-    { variantOriginModules = Dict.empty
+    { variantTypes = Dict.empty
     , useModules = Dict.empty
     , generationModules = Dict.empty
     }
@@ -238,10 +258,10 @@ projectContextToModule { generationModuleSuffix } =
                 moduleName =
                     meta |> Rule.moduleNameFromMetadata |> moduleNameToString
             in
-            case moduleName |> Parser.run (beforeDotSuffixParser generationModuleSuffix) of
-                Ok originModule ->
+            case moduleName |> Parser.run (beforeSuffixParser ("." ++ generationModuleSuffix)) of
+                Ok originModule_ ->
                     GenerationModuleContext
-                        { originModule = originModule
+                        { originModule = originModule_
                         , belowImportsColumn = 2
                         , exposing_ =
                             -- dummy. elm-review doesn't allow context change after visit
@@ -266,9 +286,13 @@ moduleContextToProject : Rule.ContextCreator ModuleContext ProjectContext
 moduleContextToProject =
     Rule.initContextCreator
         (\meta moduleKey moduleContext ->
+            let
+                moduleName =
+                    meta |> Rule.moduleNameFromMetadata |> moduleNameToString
+            in
             case moduleContext of
                 GenerationModuleContext generationModuleContext ->
-                    { variantOriginModules = Dict.empty
+                    { variantTypes = Dict.empty
                     , useModules = Dict.empty
                     , generationModules =
                         Dict.singleton
@@ -281,21 +305,19 @@ moduleContextToProject =
                     }
 
                 PossibleUseModuleContext notGenerationModuleContext ->
-                    let
-                        moduleName =
-                            meta |> Rule.moduleNameFromMetadata |> moduleNameToString
-                    in
-                    { useModules =
+                    { variantTypes = Dict.empty
+                    , generationModules = Dict.empty
+                    , useModules =
                         Dict.singleton moduleName
                             { key = moduleKey
                             , belowImportsColumn = notGenerationModuleContext.belowImportsColumn
                             , uses =
                                 notGenerationModuleContext.uses
                                     |> Dict.map
-                                        (\originModule variantsOfUsesOfVariantOriginModule ->
+                                        (\originModule_ variantsOfUsesOfVariantOriginModule ->
                                             { variantsOfUses = variantsOfUsesOfVariantOriginModule
                                             , import_ =
-                                                if Set.member originModule notGenerationModuleContext.importedModules then
+                                                if Set.member originModule_ notGenerationModuleContext.importedModules then
                                                     Present
 
                                                 else
@@ -303,8 +325,6 @@ moduleContextToProject =
                                             }
                                         )
                             }
-                    , variantOriginModules = Dict.empty
-                    , generationModules = Dict.empty
                     }
         )
         |> Rule.withMetadata
@@ -313,9 +333,9 @@ moduleContextToProject =
 
 projectContextsFold : ProjectContext -> ProjectContext -> ProjectContext
 projectContextsFold context0 context1 =
-    { variantOriginModules =
-        context0.variantOriginModules
-            |> Dict.union context1.variantOriginModules
+    { variantTypes =
+        context0.variantTypes
+            |> Dict.union context1.variantTypes
     , useModules =
         context0.useModules
             |> Dict.union context1.useModules
@@ -359,6 +379,11 @@ importVisit importNode =
                 }
         in
         case context of
+            GenerationModuleContext generationModuleContext ->
+                generationModuleContext
+                    |> belowImportsColumnUpdate
+                    |> GenerationModuleContext
+
             PossibleUseModuleContext notGenerationModuleContext ->
                 notGenerationModuleContext
                     |> belowImportsColumnUpdate
@@ -377,14 +402,16 @@ importVisit importNode =
                        )
                     |> PossibleUseModuleContext
 
-            GenerationModuleContext generationModuleContext ->
-                generationModuleContext
-                    |> belowImportsColumnUpdate
-                    |> GenerationModuleContext
 
-
-expressionVisit : Node Expression -> ModuleContext -> ModuleContext
-expressionVisit expressionNode =
+expressionVisit :
+    { nameParser : Parser String
+    , generationModuleSuffix : String
+    , maybeGenerationModuleImportAliasModuleOriginParser : Maybe String
+    , expressionNode : Node Expression
+    }
+    -> ModuleContext
+    -> ModuleContext
+expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGenerationModuleImportAliasModuleOriginParser } =
     \context ->
         case context of
             GenerationModuleContext generationModuleContext ->
@@ -397,35 +424,58 @@ expressionVisit expressionNode =
                 in
                 (case expression of
                     Expression.FunctionOrValue qualification name ->
-                        let
-                            update moduleOrigin =
-                                { notGenerationModuleContext
-                                    | uses =
-                                        notGenerationModuleContext.uses
-                                            |> Dict.update
-                                                (moduleOrigin |> moduleNameToString)
-                                                (\usesSoFar ->
-                                                    usesSoFar
-                                                        |> Maybe.withDefault Dict.empty
-                                                        |> Dict.insert name range
-                                                        |> Just
-                                                )
-                                }
-                        in
-                        case
-                            range
-                                |> ModuleNameLookupTable.moduleNameAt
-                                    notGenerationModuleContext.moduleOriginLookup
-                        of
-                            Just [] ->
+                        case name |> Parser.run nameParser of
+                            Err _ ->
                                 notGenerationModuleContext
 
-                            Just (moduleOriginPart0 :: moduleOriginPartsFrom1) ->
-                                update (moduleOriginPart0 :: moduleOriginPartsFrom1)
+                            Ok variantName ->
+                                let
+                                    addUse originModule_ =
+                                        { notGenerationModuleContext
+                                            | uses =
+                                                notGenerationModuleContext.uses
+                                                    |> Dict.update originModule_
+                                                        (\usesSoFar ->
+                                                            usesSoFar
+                                                                |> Maybe.withDefault Dict.empty
+                                                                |> Dict.insert variantName range
+                                                                |> Just
+                                                        )
+                                        }
+                                in
+                                case
+                                    range
+                                        |> ModuleNameLookupTable.moduleNameAt
+                                            notGenerationModuleContext.moduleOriginLookup
+                                of
+                                    Just [] ->
+                                        notGenerationModuleContext
 
-                            -- not imported
-                            Nothing ->
-                                update qualification
+                                    Just (moduleOriginPart0 :: moduleOriginPartsFrom1) ->
+                                        addUse (moduleOriginPart0 :: moduleOriginPartsFrom1 |> moduleNameToString)
+
+                                    -- not imported
+                                    Nothing ->
+                                        let
+                                            moduleName =
+                                                qualification |> moduleNameToString
+                                        in
+                                        case moduleName |> Parser.run (beforeSuffixParser ("." ++ generationModuleSuffix)) of
+                                            Err _ ->
+                                                case maybeGenerationModuleImportAliasModuleOriginParser of
+                                                    Nothing ->
+                                                        notGenerationModuleContext
+
+                                                    Just importAliasSuffix ->
+                                                        case moduleName |> Parser.run (beforeSuffixParser importAliasSuffix) of
+                                                            Err _ ->
+                                                                notGenerationModuleContext
+
+                                                            Ok originModule_ ->
+                                                                addUse originModule_
+
+                                            Ok originModule_ ->
+                                                addUse originModule_
 
                     _ ->
                         notGenerationModuleContext
@@ -457,55 +507,102 @@ declarationVisit declaration =
                     |> GenerationModuleContext
 
             PossibleUseModuleContext notGenerationModuleContext ->
-                (case declaration of
-                    Declaration.CustomTypeDeclaration type_ ->
-                        case type_.constructors of
-                            [ _ ] ->
-                                notGenerationModuleContext
-
-                            _ :: _ :: _ ->
-                                { notGenerationModuleContext
-                                    | variantTypes =
-                                        notGenerationModuleContext.variantTypes
-                                            |> Dict.insert
-                                                (type_.name |> Node.value)
-                                                { parameters =
-                                                    type_.generics
-                                                        |> List.map Node.value
-                                                , variants =
-                                                    type_.constructors
-                                                        |> List.map
-                                                            (\(Node variantRange variant) ->
-                                                                ( variant.name |> Node.value
-                                                                , { values =
-                                                                        variant.arguments
-                                                                            |> List.map Node.value
-                                                                  , range = variantRange
-                                                                  }
-                                                                )
-                                                            )
-                                                        |> Dict.fromList
-                                                }
-                                }
-
-                            -- shouldn't parse
-                            [] ->
-                                notGenerationModuleContext
-
-                    _ ->
+                (case declaration |> declarationToVariantType of
+                    Nothing ->
                         notGenerationModuleContext
+
+                    Just ( variantTypeName, variantType ) ->
+                        { notGenerationModuleContext
+                            | variantTypes =
+                                notGenerationModuleContext.variantTypes
+                                    |> Dict.insert variantTypeName variantType
+                        }
                 )
                     |> PossibleUseModuleContext
+
+
+dependencyModulesVisit : List Meta.Module -> ProjectContext -> ProjectContext
+dependencyModulesVisit modules =
+    \context ->
+        { context
+            | variantTypes =
+                context.variantTypes
+                    |> Dict.union
+                        (modules
+                            |> List.map
+                                (\module_ ->
+                                    ( module_.name
+                                    , module_.unions
+                                        |> List.map metaToVariantType
+                                        |> Dict.fromList
+                                    )
+                                )
+                            |> Dict.fromList
+                        )
+        }
+
+
+declarationToVariantType :
+    Declaration
+    ->
+        Maybe
+            ( String
+            , { variants :
+                    Dict
+                        String
+                        { range : Range
+                        , values : List CodeGen.TypeAnnotation
+                        }
+              , parameters : List String
+              }
+            )
+declarationToVariantType =
+    \declaration ->
+        case declaration of
+            Declaration.CustomTypeDeclaration type_ ->
+                case type_.constructors of
+                    -- shouldn't parse
+                    [] ->
+                        Nothing
+
+                    -- in the future? add accessors for 1-constructor-`type`s
+                    [ _ ] ->
+                        Nothing
+
+                    variant0 :: variant1 :: variantsFrom2 ->
+                        ( type_.name |> Node.value
+                        , { parameters =
+                                type_.generics
+                                    |> List.map Node.value
+                          , variants =
+                                (variant0 :: variant1 :: variantsFrom2)
+                                    |> List.map
+                                        (\(Node variantRange variant) ->
+                                            ( variant.name |> Node.value
+                                            , { values =
+                                                    variant.arguments
+                                                        |> List.map Node.value
+                                              , range = variantRange
+                                              }
+                                            )
+                                        )
+                                    |> Dict.fromList
+                          }
+                        )
+                            |> Just
+
+            _ ->
+                Nothing
 
 
 generatePrisms :
     { generator : VariantPrismGenerator
     , generationModuleSuffix : String
-    , generationModuleImportAlias : Maybe ({ originModule : String } -> String)
+    , generationModuleImportAliasOriginModuleSuffix : Maybe String
     , context : ProjectContext
     }
     -> List (Rule.Error { useErrorForModule : () })
-generatePrisms { context, generator, generationModuleSuffix, generationModuleImportAlias } =
+generatePrisms { context, generator, generationModuleSuffix, generationModuleImportAliasOriginModuleSuffix } =
     context.useModules
         |> Dict.values
         |> List.concatMap
@@ -514,11 +611,11 @@ generatePrisms { context, generator, generationModuleSuffix, generationModuleImp
                     |> Dict.toList
                     |> List.concatMap
                         (\( variantOriginModuleName, usedVariantOriginModule ) ->
-                            case context.variantOriginModules |> Dict.get variantOriginModuleName of
+                            case context.variantTypes |> Dict.get variantOriginModuleName of
                                 Nothing ->
                                     []
 
-                                Just originModule ->
+                                Just variantTypes ->
                                     let
                                         firstUseRange =
                                             usedVariantOriginModule.variantsOfUses
@@ -555,10 +652,10 @@ generatePrisms { context, generator, generationModuleSuffix, generationModuleImp
                                                         firstUseRange
                                                         [ [ "\n"
                                                           , [ CodeGen.importStmt [ variantOriginModuleName, generationModuleSuffix ]
-                                                                (generationModuleImportAlias
+                                                                (generationModuleImportAliasOriginModuleSuffix
                                                                     |> Maybe.map
-                                                                        (\aliasOf ->
-                                                                            [ aliasOf { originModule = variantOriginModuleName } ]
+                                                                        (\aliasSuffix ->
+                                                                            [ variantOriginModuleName ++ aliasSuffix ]
                                                                         )
                                                                 )
                                                                 Nothing
@@ -570,7 +667,7 @@ generatePrisms { context, generator, generationModuleSuffix, generationModuleImp
                                                             |> Fix.insertAt (useModule.belowImportsColumn |> onRow 1)
                                                         ]
                                                     ]
-                                            , originModule.variantTypes
+                                            , variantTypes
                                                 |> Dict.toList
                                                 |> List.concatMap
                                                     (\( variantTypeName, variantType ) ->
@@ -581,15 +678,15 @@ generatePrisms { context, generator, generationModuleSuffix, generationModuleImp
                                                                 )
                                                             |> Dict.toList
                                                             |> List.map
-                                                                (\( variantName, variant ) ->
+                                                                (\( variantName, variantValues ) ->
                                                                     let
                                                                         generated =
-                                                                            generator
+                                                                            generator.build
                                                                                 { variantModule = variantOriginModuleName
                                                                                 , typeName = variantTypeName
                                                                                 , typeParameters = variantType.parameters
                                                                                 , variantName = variantName
-                                                                                , variantValues = variant.values
+                                                                                , variantValues = variantValues
                                                                                 }
                                                                     in
                                                                     Rule.errorForModuleWithFix generationModule.key
@@ -671,31 +768,24 @@ prismDeclarationCodeGen =
     VariantPrism.GenerateUsed.accessors
         |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
             "Extra.Local"
-        |> VariantPrism.GenerateUsed.importGenerationModuleAs
-            (\{ originModule } -> originModule ++ "On")
+        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
         |> VariantPrism.GenerateUsed.rule
 
   - [`inVariantOriginModuleDotSuffix "Extra.Local"`](#inVariantOriginModuleDotSuffix)
     → prisms are generated in the `module YourVariantOriginModule.Extra.Local`
-  - [`importGenerationModuleAs (\{ originModule } -> originModule ++ "On")`](#importGenerationModuleAs)
-    → automatic `import`s of the generation `module` `as YourVariantOriginModuleOn`
+  - [`importGenerationModuleAsOriginModuleWithSuffix ""`](#importGenerationModuleAsOriginModuleWithSuffix)
+    → automatic `import`s of the generation `module` `as YourVariantOriginModule`
 
 Choose what you like best:
 
-  - `import RemoteData.Variant.Generated as RemoteDataVariant`, then `RemoteDataVariant.success`?
+  - `import RemoteData.Variant.Generated as RemoteDataVariant`, then `RemoteDataVariant.onSuccess`?
 
         inVariantOriginModuleDotSuffix "Variant.Generated"
-            |> importGenerationModuleAs
-                ({ originModule } -> originModule ++ "Variant")
+            |> importGenerationModuleAsOriginModuleWithSuffix "Variant"
 
   - `RemoteData.Generated.onSuccess`?
 
         inVariantOriginModuleDotSuffix "Generated"
-            |> importGenerationModuleAs .originModule
-
-  - `RemoteData.On.success`
-
-        inVariantOriginModuleDotSuffix "On"
 
   - ...
 
@@ -704,27 +794,42 @@ type Config
     = Config
         { generator : VariantPrismGenerator
         , generationModuleSuffix : String
-        , generationModuleImportAlias : Maybe ({ originModule : String } -> String)
+        , generationModuleImportAliasOriginModuleSuffix : Maybe String
         }
 
 
-{-| You can optionally configure aliases when `import`ing automatically using [importGenerationModuleAs](#importGenerationModuleAs).
+{-| You can optionally configure aliases when `import`ing automatically using [importGenerationModuleAsOriginModuleWithSuffix](#importGenerationModuleAsOriginModuleWithSuffix).
 -}
 inVariantOriginModuleDotSuffix : String -> VariantPrismGenerator -> Config
 inVariantOriginModuleDotSuffix generationModuleSuffix =
     \generator ->
         { generator = generator
         , generationModuleSuffix = generationModuleSuffix
-        , generationModuleImportAlias = Nothing
+        , generationModuleImportAliasOriginModuleSuffix = Nothing
         }
             |> Config
 
 
-importGenerationModuleAs : ({ originModule : String } -> String) -> Config -> Config
-importGenerationModuleAs generationModuleImportAlias =
+{-| When using a variant prism
+
+    DataX.onVariant
+
+To generate an automatic `import`
+
+    import Data.Extra.Local as DataX
+
+use
+
+    importGenerationModuleAsOriginModuleWithSuffix "X"
+
+Remember that elm doesn't allow `.`s in `import` aliases.
+
+-}
+importGenerationModuleAsOriginModuleWithSuffix : String -> Config -> Config
+importGenerationModuleAsOriginModuleWithSuffix generationModuleImportAlias =
     \(Config config) ->
         { config
-            | generationModuleImportAlias =
+            | generationModuleImportAliasOriginModuleSuffix =
                 generationModuleImportAlias |> Just
         }
             |> Config
@@ -736,7 +841,7 @@ importGenerationModuleWithoutAlias : Config -> Config
 importGenerationModuleWithoutAlias =
     \(Config config) ->
         { config
-            | generationModuleImportAlias = Nothing
+            | generationModuleImportAliasOriginModuleSuffix = Nothing
         }
             |> Config
 
@@ -913,7 +1018,14 @@ implementation { variantName, variantValues } =
 
 {-| Named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/) which
 
-with `generationModuleSuffix = "On"` and
+with
+
+    VariantPrism.GenerateUsed.accessors
+        |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
+            "Extra.Local"
+        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
+
+and
 
     module Data exposing (Data(..))
 
@@ -923,7 +1035,7 @@ with `generationModuleSuffix = "On"` and
 
 generates
 
-    module Data.On exposing (some)
+    module Data.Extra.Local exposing (onSome)
 
     import Accessors exposing (makeOneToN_)
     import Data exposing (Data(..))
@@ -958,66 +1070,88 @@ generates
 -}
 accessors : VariantPrismGenerator
 accessors =
-    \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
-        { imports =
-            [ CodeGen.importStmt [ "Accessors" ]
-                Nothing
-                ([ CodeGen.funExpose "makeOneToN_" ]
-                    |> CodeGen.exposeExplicit
-                    |> Just
-                )
-            ]
-        , declaration =
-            { documentation =
-                CodeGen.emptyDocComment
-                    |> CodeGen.markdown
-                        ([ "Accessor prism for the variant `"
-                         , variantName
-                         , "` of the `type "
-                         , typeName
-                         , "`."
-                         ]
-                            |> String.concat
-                        )
-                    |> Just
-            , name = variantName
-            , annotation =
-                CodeGen.funAnn
-                    (CodeGen.typed "Relation"
-                        [ case variantValues of
-                            [] ->
-                                CodeGen.unitAnn
+    { nameParser = prismNameOnVariantParser
+    , build =
+        \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
+            { imports =
+                [ CodeGen.importStmt [ "Accessors" ]
+                    Nothing
+                    ([ CodeGen.funExpose "makeOneToN_" ]
+                        |> CodeGen.exposeExplicit
+                        |> Just
+                    )
+                ]
+            , declaration =
+                { documentation =
+                    CodeGen.emptyDocComment
+                        |> CodeGen.markdown
+                            ([ "Accessor prism for the variant `"
+                             , variantName
+                             , "` of the `type "
+                             , typeName
+                             , "`."
+                             ]
+                                |> String.concat
+                            )
+                        |> Just
+                , name = variantName
+                , annotation =
+                    CodeGen.funAnn
+                        (CodeGen.typed "Relation"
+                            [ case variantValues of
+                                [] ->
+                                    CodeGen.unitAnn
 
-                            top :: down ->
-                                Stack.topDown top down
-                                    |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ soFar, value ])
-                        , CodeGen.typeVar "reachable"
-                        , CodeGen.typeVar "wrap"
+                                top :: down ->
+                                    Stack.topDown top down
+                                        |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ soFar, value ])
+                            , CodeGen.typeVar "reachable"
+                            , CodeGen.typeVar "wrap"
+                            ]
+                        )
+                        (CodeGen.typed "Relation"
+                            [ CodeGen.typed typeName
+                                (typeParameters |> List.map CodeGen.typeVar)
+                            , CodeGen.typeVar "reachable"
+                            , CodeGen.maybeAnn (CodeGen.typeVar "wrap")
+                            ]
+                        )
+                        |> Just
+                , implementation =
+                    let
+                        { access, alter } =
+                            implementation
+                                { variantName = variantName
+                                , variantValues = variantValues
+                                }
+                    in
+                    CodeGen.construct "makeOneToN_"
+                        [ CodeGen.string (variantModule ++ "." ++ variantName)
+                        , access
+                        , alter
                         ]
-                    )
-                    (CodeGen.typed "Relation"
-                        [ CodeGen.typed typeName
-                            (typeParameters |> List.map CodeGen.typeVar)
-                        , CodeGen.typeVar "reachable"
-                        , CodeGen.maybeAnn (CodeGen.typeVar "wrap")
-                        ]
-                    )
-                    |> Just
-            , implementation =
-                let
-                    { access, alter } =
-                        implementation
-                            { variantName = variantName
-                            , variantValues = variantValues
-                            }
-                in
-                CodeGen.construct "makeOneToN_"
-                    [ CodeGen.string (variantModule ++ "." ++ variantName)
-                    , access
-                    , alter
-                    ]
+                }
             }
-        }
+    }
+
+
+{-|
+
+    import Parser
+    import VariantPrism.GenerateUsed
+
+    "onSuccess"
+        |> Parser.run VariantPrism.GenerateUsed.prismNameOnVariantParser
+    --> "Success"
+
+-}
+prismNameOnVariantParser : Parser String
+prismNameOnVariantParser =
+    Parser.succeed identity
+        |. Parser.token "on"
+        |= (Parser.chompWhile (\_ -> True)
+                |> Parser.getChompedString
+           )
 
 
 {-| How to generate a [`VariantPrismDeclaration`](#VariantPrismDeclaration) plus the necessary `import`s.
@@ -1029,32 +1163,39 @@ Out of the box there are lenses for
 You can also create a custom one with the help of [the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest):
 
     customVariantPrism : VariantPrismGenerator
-    customVariantPrism { ... } =
-        { imports =
-            [ importStmt [ "CustomPrism" ]
-                Nothing
-                (exposeExplicit
-                    [ typeOrAliasExpose "CustomPrism" ]
-                    |> Just
-                )
-            ]
-        , declaration = ...
+    customVariantPrism =
+        { nameParser = prismNameOnVariantParser
+        , build =
+            \{ ... } ->
+                { imports =
+                    [ importStmt [ "CustomPrism" ]
+                        Nothing
+                        (exposeExplicit
+                            [ typeOrAliasExpose "CustomPrism" ]
+                            |> Just
+                        )
+                    ]
+                , declaration = ...
+                }
         }
 
 → for `declaration`, see [`VariantPrismDeclaration`](#VariantPrismDeclaration)
 
 -}
 type alias VariantPrismGenerator =
-    { variantModule : String
-    , typeName : String
-    , typeParameters : List String
-    , variantName : String
-    , variantValues : List CodeGen.TypeAnnotation
-    }
-    ->
-        { declaration : VariantPrismDeclaration
-        , imports : List CodeGen.Import
+    { nameParser : Parser String
+    , build :
+        { variantModule : String
+        , typeName : String
+        , typeParameters : List String
+        , variantName : String
+        , variantValues : List CodeGen.TypeAnnotation
         }
+        ->
+            { declaration : VariantPrismDeclaration
+            , imports : List CodeGen.Import
+            }
+    }
 
 
 {-| All the components to build a field lens declaration:
@@ -1112,8 +1253,8 @@ names will be [decapitalized](https://package.elm-lang.org/packages/elm-communit
 
 -}
 type alias VariantPrismDeclaration =
-    { documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
-    , name : String
+    { name : String
+    , documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
     , annotation : Maybe CodeGen.TypeAnnotation
     , implementation : CodeGen.Expression
     }

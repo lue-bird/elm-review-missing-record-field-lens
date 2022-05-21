@@ -5,8 +5,8 @@ import Fuzz
 import Parser
 import Review.Test
 import Test exposing (Test, describe, test)
-import VariantPrism.GenerateUsed exposing (accessors, rule)
-import VariantPrism.GenerateUsed.Testable exposing (beforeDotSuffixParser)
+import VariantPrism.GenerateUsed
+import VariantPrism.GenerateUsed.Testable exposing (beforeSuffixParser)
 
 
 all : Test
@@ -25,67 +25,68 @@ all =
             "name parser"
             (\{ baseModule, generationModuleSuffix } ->
                 (baseModule ++ "." ++ generationModuleSuffix)
-                    |> Parser.run (beforeDotSuffixParser generationModuleSuffix)
+                    |> Parser.run (beforeSuffixParser generationModuleSuffix)
                     |> Expect.equal (Ok baseModule)
             )
-        , describe "should generate" shouldGenerate
-        , describe "should not generate" dontGenerate
+        , generates
+        , dontGenerate
         ]
 
 
-shouldGenerate : List Test
-shouldGenerate =
-    [ test "multiple variant values, generation module exposing (..)"
-        (\() ->
-            [ """module Data.On exposing (..)
+generates : Test
+generates =
+    describe "generates"
+        [ test "multiple variant values, generation module exposing (..)"
+            (\() ->
+                [ """module Data.Extra.Local exposing (..)
 """
-            , """module Use exposing (..)
+                , """module Use exposing (..)
 
-using = Data.On.some
+using = Data.onSome
 
 """
-            , """module Data exposing (Data(..))
+                , """module Data exposing (Data(..))
 
 type Data a b c d
     = Some a b c d
     | None
 """
-            ]
-                |> Review.Test.runOnModules
-                    (rule
-                        { generator = accessors
-                        , generationModuleSuffix = "On"
-                        , importGenerationModuleAs = Nothing
-                        }
-                    )
-                |> Review.Test.expectErrorsForModules
-                    [ ( "Use"
-                      , [ Review.Test.error
-                            { message = "missing `import Data.On`"
-                            , details =
-                                [ "Add the variant prism generation `module` `import` through the supplied fix" ]
-                            , under = "Data.On.some"
-                            }
-                            |> Review.Test.whenFixed
-                                """module Use exposing (..)
+                ]
+                    |> Review.Test.runOnModules
+                        (VariantPrism.GenerateUsed.accessors
+                            |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
+                                "Extra.Local"
+                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
+                            |> VariantPrism.GenerateUsed.rule
+                        )
+                    |> Review.Test.expectErrorsForModules
+                        [ ( "Use"
+                          , [ Review.Test.error
+                                { message = "missing `import Data.Extra.Local`"
+                                , details =
+                                    [ "Add the variant prism generation `module` `import` through the supplied fix" ]
+                                , under = "Data.onSome"
+                                }
+                                |> Review.Test.whenFixed
+                                    """module Use exposing (..)
 
-import Data.On
-using = Data.On.some
+import Data.Extra.Local as Data
+using = Data.onSome
 
 """
-                        ]
-                      )
-                    , ( "Data.On"
-                      , [ Review.Test.error
-                            { message = "missing prism for variant `Some`"
-                            , details =
-                                [ "A variant prism with this name is used in other `module`s."
-                                , "Add the generated prism declaration through the fix."
-                                ]
-                            , under = "(..)"
-                            }
-                            |> Review.Test.whenFixed
-                                """module Data.On exposing (some)
+                            ]
+                          )
+                        , ( "Data.Extra.Local"
+                          , [ Review.Test.error
+                                { message = "missing prism for variant `Some`"
+                                , details =
+                                    [ "A variant prism with this name is used in other `module`s."
+                                    , "Add the generated prism declaration through the fix."
+                                    ]
+                                , under = "(..)"
+                                }
+                                |> Review.Test.whenFixed
+                                    """module Data.Extra.Local exposing (some)
 
 import Accessors exposing (makeOneToN_)
 import Data exposing (Data(..))
@@ -116,63 +117,60 @@ some =
                 someNot ->
                     someNot
         )"""
+                            ]
+                          )
                         ]
-                      )
-                    ]
-        )
-    ]
+            )
+        ]
 
 
-dontGenerate : List Test
+dontGenerate : Test
 dontGenerate =
-    [ test "attempt to fix Lens-able types"
-        (\() ->
-            """module A exposing (..)
+    describe "doesn't generate"
+        [ test "attempt to fix Lens-able types"
+            (\() ->
+                [ """module Data exposing (..)
 
-
-type NotAVariant =
-    NotAVariant String
+type One
+    = One String
 """
-                |> Review.Test.run
-                    (rule
-                        { generator = accessors
-                        , generationModuleSuffix = "On"
-                        , importGenerationModuleAs = Nothing
-                        }
-                    )
-                |> Review.Test.expectNoErrors
-        )
-    , test "generate Prism for variants that already have a prism defined."
-        (\() ->
-            """module A exposing (..)
+                , """module Use
+
+use = Data.onOne
+"""
+                ]
+                    |> Review.Test.runOnModules
+                        (VariantPrism.GenerateUsed.accessors
+                            |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
+                                "Extra.Local"
+                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
+                            |> VariantPrism.GenerateUsed.rule
+                        )
+                    |> Review.Test.expectNoErrors
+            )
+        , test "generate Prism for variants that already have a prism defined."
+            (\() ->
+                [ """module Data exposing (..)
 
 type AlreadyDefined a
     = DontError a
     | Whatever
 
 variantDontError : Prism (AlreadyDefined a) a
-variantDontError =
-    makeOneToOne "variantDontError"
-        (\\t ->
-            case t of
-                DontError a -> Just a
-                otherwise -> Nothing
-            )
-        (\\fn t ->
-            case t of
-                DontError a -> DontError (fn a)
-                otherwise -> otherwise
-        )
-
-
+variantDontError = ()
 """
-                |> Review.Test.run
-                    (rule
-                        { generator = accessors
-                        , generationModuleSuffix = "On"
-                        , importGenerationModuleAs = Nothing
-                        }
-                    )
-                |> Review.Test.expectNoErrors
-        )
-    ]
+                , """module Use
+
+use = Data.onOne
+"""
+                ]
+                    |> Review.Test.runOnModules
+                        (VariantPrism.GenerateUsed.accessors
+                            |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
+                                "Extra.Local"
+                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
+                            |> VariantPrism.GenerateUsed.rule
+                        )
+                    |> Review.Test.expectNoErrors
+            )
+        ]
