@@ -19,6 +19,6 @@ config =
     [ VariantPrism.GenerateUsed.accessors
         |> VariantPrism.inVariantOriginModuleDotSuffix
             "Extra.Local"
-        |> VariantPrism.importGenerationModuleAsOriginModuleWithSuffix ""
+        |> VariantPrism.importGenerationModuleAsOriginModule
         |> VariantPrism.GenerateUsed.rule
     ]

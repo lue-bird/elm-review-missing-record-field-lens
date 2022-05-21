@@ -56,7 +56,7 @@ type Data a b c d
                         (VariantPrism.GenerateUsed.accessors
                             |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
                                 "Extra.Local"
-                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
+                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
                             |> VariantPrism.GenerateUsed.rule
                         )
                     |> Review.Test.expectErrorsForModules
@@ -143,7 +143,7 @@ use = Data.onOne
                         (VariantPrism.GenerateUsed.accessors
                             |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
                                 "Extra.Local"
-                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
+                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
                             |> VariantPrism.GenerateUsed.rule
                         )
                     |> Review.Test.expectNoErrors
@@ -168,7 +168,7 @@ use = Data.onOne
                         (VariantPrism.GenerateUsed.accessors
                             |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
                                 "Extra.Local"
-                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
+                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
                             |> VariantPrism.GenerateUsed.rule
                         )
                     |> Review.Test.expectNoErrors

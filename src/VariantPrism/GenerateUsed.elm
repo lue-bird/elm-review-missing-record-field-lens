@@ -2,7 +2,7 @@ module VariantPrism.GenerateUsed exposing
     ( rule
     , Config(..)
     , inVariantOriginModuleDotSuffix
-    , importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleWithoutAlias
+    , GenerationModuleImportAlias, importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleAsOriginModule, importGenerationModuleWithoutAlias
     , accessors
     , VariantPrismGenerator, VariantPrismDeclaration, implementation, withDocumentation, withName, prismNameOnVariantParser
     )
@@ -16,7 +16,7 @@ module VariantPrism.GenerateUsed exposing
 
 @docs Config
 @docs inVariantOriginModuleDotSuffix
-@docs importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleWithoutAlias
+@docs GenerationModuleImportAlias, importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleAsOriginModule, importGenerationModuleWithoutAlias
 
 
 ## generators
@@ -67,7 +67,7 @@ that are called from your code but aren't already defined in a dedicated `module
         [ VariantPrism.GenerateUsed.accessors
             |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
                 "Extra.Local"
-            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
+            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
             |> VariantPrism.GenerateUsed.rule
         ]
 
@@ -88,7 +88,7 @@ boilerplate related to updating potentially deeply nested data.
 rule : Config -> Rule
 rule config =
     let
-        (Config { generator, generationModuleSuffix, generationModuleImportAliasOriginModuleSuffix }) =
+        (Config { generator, generationModuleSuffix, generationModuleImportAlias }) =
             config
     in
     Rule.newProjectRuleSchema
@@ -128,8 +128,7 @@ rule config =
                                 |> expressionVisit
                                     { nameParser = generator.nameParser
                                     , generationModuleSuffix = generationModuleSuffix
-                                    , maybeGenerationModuleImportAliasModuleOriginParser =
-                                        generationModuleImportAliasOriginModuleSuffix
+                                    , maybeGenerationModuleImportAlias = generationModuleImportAlias
                                     , expressionNode = expressionNode
                                     }
                             )
@@ -153,8 +152,7 @@ rule config =
                     { context = context
                     , generator = generator
                     , generationModuleSuffix = generationModuleSuffix
-                    , generationModuleImportAliasOriginModuleSuffix =
-                        generationModuleImportAliasOriginModuleSuffix
+                    , generationModuleImportAlias = generationModuleImportAlias
                     }
             )
         |> Rule.fromProjectRuleSchema
@@ -406,12 +404,12 @@ importVisit importNode =
 expressionVisit :
     { nameParser : Parser String
     , generationModuleSuffix : String
-    , maybeGenerationModuleImportAliasModuleOriginParser : Maybe String
+    , maybeGenerationModuleImportAlias : Maybe GenerationModuleImportAlias
     , expressionNode : Node Expression
     }
     -> ModuleContext
     -> ModuleContext
-expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGenerationModuleImportAliasModuleOriginParser } =
+expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGenerationModuleImportAlias } =
     \context ->
         case context of
             GenerationModuleContext generationModuleContext ->
@@ -462,11 +460,14 @@ expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGener
                                         in
                                         case moduleName |> Parser.run (beforeSuffixParser ("." ++ generationModuleSuffix)) of
                                             Err _ ->
-                                                case maybeGenerationModuleImportAliasModuleOriginParser of
+                                                case maybeGenerationModuleImportAlias of
                                                     Nothing ->
                                                         notGenerationModuleContext
 
-                                                    Just importAliasSuffix ->
+                                                    Just OriginModule ->
+                                                        addUse moduleName
+
+                                                    Just (OriginModuleWithSuffix importAliasSuffix) ->
                                                         case moduleName |> Parser.run (beforeSuffixParser importAliasSuffix) of
                                                             Err _ ->
                                                                 notGenerationModuleContext
@@ -598,11 +599,11 @@ declarationToVariantType =
 generatePrisms :
     { generator : VariantPrismGenerator
     , generationModuleSuffix : String
-    , generationModuleImportAliasOriginModuleSuffix : Maybe String
+    , generationModuleImportAlias : Maybe GenerationModuleImportAlias
     , context : ProjectContext
     }
     -> List (Rule.Error { useErrorForModule : () })
-generatePrisms { context, generator, generationModuleSuffix, generationModuleImportAliasOriginModuleSuffix } =
+generatePrisms { context, generator, generationModuleSuffix, generationModuleImportAlias } =
     context.useModules
         |> Dict.values
         |> List.concatMap
@@ -652,10 +653,16 @@ generatePrisms { context, generator, generationModuleSuffix, generationModuleImp
                                                         firstUseRange
                                                         [ [ "\n"
                                                           , [ CodeGen.importStmt [ variantOriginModuleName, generationModuleSuffix ]
-                                                                (generationModuleImportAliasOriginModuleSuffix
+                                                                (generationModuleImportAlias
                                                                     |> Maybe.map
-                                                                        (\aliasSuffix ->
-                                                                            [ variantOriginModuleName ++ aliasSuffix ]
+                                                                        (\alias_ ->
+                                                                            [ case alias_ of
+                                                                                OriginModule ->
+                                                                                    variantOriginModuleName
+
+                                                                                OriginModuleWithSuffix aliasSuffix ->
+                                                                                    variantOriginModuleName ++ aliasSuffix
+                                                                            ]
                                                                         )
                                                                 )
                                                                 Nothing
@@ -768,12 +775,12 @@ prismDeclarationCodeGen =
     VariantPrism.GenerateUsed.accessors
         |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
             "Extra.Local"
-        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
+        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
         |> VariantPrism.GenerateUsed.rule
 
   - [`inVariantOriginModuleDotSuffix "Extra.Local"`](#inVariantOriginModuleDotSuffix)
     → prisms are generated in the `module YourVariantOriginModule.Extra.Local`
-  - [`importGenerationModuleAsOriginModuleWithSuffix ""`](#importGenerationModuleAsOriginModuleWithSuffix)
+  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModuleWithSuffix)
     → automatic `import`s of the generation `module` `as YourVariantOriginModule`
 
 Choose what you like best:
@@ -794,18 +801,47 @@ type Config
     = Config
         { generator : VariantPrismGenerator
         , generationModuleSuffix : String
-        , generationModuleImportAliasOriginModuleSuffix : Maybe String
+        , generationModuleImportAlias : Maybe GenerationModuleImportAlias
         }
 
 
-{-| You can optionally configure aliases when `import`ing automatically using [importGenerationModuleAsOriginModuleWithSuffix](#importGenerationModuleAsOriginModuleWithSuffix).
+{-| Configuration for a generation `module` `import` alias. Use
+
+  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModule)
+  - [`importGenerationModuleAsOriginModuleWithSuffix`](#importGenerationModuleAsOriginModuleWithSuffix)
+
+-}
+type GenerationModuleImportAlias
+    = OriginModule
+    | OriginModuleWithSuffix String
+
+
+{-| Generation `module`s are derived from variant origin `module`s using the configured `.Suffix`.
+
+for
+
+    module Data exposing (Data(..))
+
+with
+
+    inVariantOriginModuleDotSuffix "Extra.Local"
+
+the generation `module` is named
+
+    module Data.Extra.Local exposing (onSome)
+
+You can optionally configure aliases when `import`ing generation `module`s automatically using
+
+  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModule)
+  - [`importGenerationModuleAsOriginModuleWithSuffix`](#importGenerationModuleAsOriginModuleWithSuffix)
+
 -}
 inVariantOriginModuleDotSuffix : String -> VariantPrismGenerator -> Config
 inVariantOriginModuleDotSuffix generationModuleSuffix =
     \generator ->
         { generator = generator
         , generationModuleSuffix = generationModuleSuffix
-        , generationModuleImportAliasOriginModuleSuffix = Nothing
+        , generationModuleImportAlias = Nothing
         }
             |> Config
 
@@ -826,22 +862,48 @@ Remember that elm doesn't allow `.`s in `import` aliases.
 
 -}
 importGenerationModuleAsOriginModuleWithSuffix : String -> Config -> Config
-importGenerationModuleAsOriginModuleWithSuffix generationModuleImportAlias =
+importGenerationModuleAsOriginModuleWithSuffix generationModuleImportAliasSuffixForOriginModule =
     \(Config config) ->
         { config
-            | generationModuleImportAliasOriginModuleSuffix =
-                generationModuleImportAlias |> Just
+            | generationModuleImportAlias =
+                OriginModuleWithSuffix generationModuleImportAliasSuffixForOriginModule
+                    |> Just
         }
             |> Config
 
 
-{-| Drop potential configured aliases when `import`ing automatically.
+{-| When using a variant prism
+
+    Data.onVariant
+
+To generate an automatic `import`
+
+    import Data.Extra.Local as Data
+
+use
+
+    importGenerationModuleAsOriginModule
+
+Remember that elm doesn't allow `.`s in `import` aliases.
+
+-}
+importGenerationModuleAsOriginModule : Config -> Config
+importGenerationModuleAsOriginModule =
+    \(Config config) ->
+        { config
+            | generationModuleImportAlias =
+                OriginModule |> Just
+        }
+            |> Config
+
+
+{-| Drop potential configured aliases when `import`ing the generation `module` automatically.
 -}
 importGenerationModuleWithoutAlias : Config -> Config
 importGenerationModuleWithoutAlias =
     \(Config config) ->
         { config
-            | generationModuleImportAliasOriginModuleSuffix = Nothing
+            | generationModuleImportAlias = Nothing
         }
             |> Config
 
@@ -1023,7 +1085,7 @@ with
     VariantPrism.GenerateUsed.accessors
         |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
             "Extra.Local"
-        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModuleWithSuffix ""
+        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
 
 and
 
