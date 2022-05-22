@@ -148,7 +148,7 @@ rule config =
             }
         |> Rule.withFinalProjectEvaluation
             (\context ->
-                generatePrisms
+                generateForProject
                     { context = context
                     , generator = generator
                     , generationModuleSuffix = generationModuleSuffix
@@ -596,14 +596,14 @@ declarationToVariantType =
                 Nothing
 
 
-generatePrisms :
+generateForProject :
     { generator : VariantPrismGenerator
     , generationModuleSuffix : String
     , generationModuleImportAlias : Maybe GenerationModuleImportAlias
     , context : ProjectContext
     }
     -> List (Rule.Error { useErrorForModule : () })
-generatePrisms { context, generator, generationModuleSuffix, generationModuleImportAlias } =
+generateForProject { context, generator, generationModuleSuffix, generationModuleImportAlias } =
     context.useModules
         |> Dict.values
         |> List.concatMap
@@ -617,140 +617,160 @@ generatePrisms { context, generator, generationModuleSuffix, generationModuleImp
                                     []
 
                                 Just variantTypes ->
-                                    let
-                                        firstUseRange =
-                                            usedVariantOriginModule.variantsOfUses
-                                                |> Dict.values
-                                                |> List.head
-                                                -- not expected
-                                                |> Maybe.withDefault Range.emptyRange
-                                    in
-                                    case context.generationModules |> Dict.get variantOriginModuleName of
-                                        Nothing ->
-                                            [ Rule.errorForModule useModule.key
-                                                { message =
-                                                    [ "missing generation `module ", variantOriginModuleName, ".", generationModuleSuffix, "`" ]
-                                                        |> String.concat
-                                                , details =
-                                                    [ "Create this elm file where variant prisms will be generated in." ]
-                                                }
-                                                firstUseRange
-                                            ]
-
-                                        Just generationModule ->
-                                            [ case usedVariantOriginModule.import_ of
-                                                Present ->
-                                                    []
-
-                                                Missing ->
-                                                    [ Rule.errorForModuleWithFix useModule.key
-                                                        { message =
-                                                            [ "missing `import ", variantOriginModuleName, ".", generationModuleSuffix, "`" ]
-                                                                |> String.concat
-                                                        , details =
-                                                            [ "Add the variant prism generation `module` `import` through the supplied fix" ]
-                                                        }
-                                                        firstUseRange
-                                                        [ [ "\n"
-                                                          , [ CodeGen.importStmt [ variantOriginModuleName, generationModuleSuffix ]
-                                                                (generationModuleImportAlias
-                                                                    |> Maybe.map
-                                                                        (\alias_ ->
-                                                                            [ case alias_ of
-                                                                                OriginModule ->
-                                                                                    variantOriginModuleName
-
-                                                                                OriginModuleWithSuffix aliasSuffix ->
-                                                                                    variantOriginModuleName ++ aliasSuffix
-                                                                            ]
-                                                                        )
-                                                                )
-                                                                Nothing
-                                                            ]
-                                                                |> CodeGen.prettyImports
-                                                                |> pretty 1000
-                                                          ]
-                                                            |> String.concat
-                                                            |> Fix.insertAt (useModule.belowImportsColumn |> onRow 1)
-                                                        ]
-                                                    ]
-                                            , variantTypes
-                                                |> Dict.toList
-                                                |> List.concatMap
-                                                    (\( variantTypeName, variantType ) ->
-                                                        variantType.variants
-                                                            |> Dict.filter
-                                                                (\variantName _ ->
-                                                                    Dict.member variantName usedVariantOriginModule.variantsOfUses
-                                                                )
-                                                            |> Dict.toList
-                                                            |> List.map
-                                                                (\( variantName, variantValues ) ->
-                                                                    let
-                                                                        generated =
-                                                                            generator.build
-                                                                                { variantModule = variantOriginModuleName
-                                                                                , typeName = variantTypeName
-                                                                                , typeParameters = variantType.parameters
-                                                                                , variantName = variantName
-                                                                                , variantValues = variantValues
-                                                                                }
-                                                                    in
-                                                                    Rule.errorForModuleWithFix generationModule.key
-                                                                        { message =
-                                                                            [ "missing prism for variant `", variantName, "`" ]
-                                                                                |> String.concat
-                                                                        , details =
-                                                                            [ "A variant prism with this name is used in other `module`s."
-                                                                            , "Add the generated prism declaration through the fix."
-                                                                            ]
-                                                                        }
-                                                                        (generationModule.exposing_ |> Node.range)
-                                                                        [ [ "\n\n"
-                                                                          , generated.declaration
-                                                                                |> prismDeclarationCodeGen
-                                                                                |> CodeGen.prettyDeclaration 100
-                                                                                |> pretty 100
-                                                                          ]
-                                                                            |> String.concat
-                                                                            |> Fix.insertAt (generationModule.belowImportsColumn |> onRow 1)
-                                                                        , case generationModule.exposing_ of
-                                                                            Node _ (Exposing.All dotDotRange) ->
-                                                                                Fix.replaceRangeBy dotDotRange variantName
-
-                                                                            Node exposeRange (Exposing.Explicit exposes) ->
-                                                                                (variantName ++ ", ")
-                                                                                    |> Fix.insertAt
-                                                                                        (case exposes of
-                                                                                            (Node firstExposeRange _) :: _ ->
-                                                                                                firstExposeRange.start
-
-                                                                                            -- exposing () shouldn't parse
-                                                                                            [] ->
-                                                                                                exposeRange.end
-                                                                                        )
-                                                                        , [ "\n"
-                                                                          , generated.imports
-                                                                                |> (::)
-                                                                                    (CodeGen.importStmt [ variantOriginModuleName ]
-                                                                                        Nothing
-                                                                                        ([ CodeGen.openTypeExpose variantTypeName ]
-                                                                                            |> CodeGen.exposeExplicit
-                                                                                            |> Just
-                                                                                        )
-                                                                                    )
-                                                                                |> CodeGen.prettyImports
-                                                                                |> pretty 1000
-                                                                          ]
-                                                                            |> String.concat
-                                                                            |> Fix.insertAt (generationModule.belowImportsColumn |> onRow 1)
-                                                                        ]
-                                                                )
-                                                    )
-                                            ]
-                                                |> List.concat
+                                    generateForModule
+                                        { maybeGenerationModule =
+                                            context.generationModules |> Dict.get variantOriginModuleName
+                                        , usedVariantOriginModule = usedVariantOriginModule
+                                        , variantOriginModuleName = variantOriginModuleName
+                                        , generationModuleImportAlias = generationModuleImportAlias
+                                        , generationModuleSuffix = generationModuleSuffix
+                                        , useModule = useModule
+                                        , generator = generator
+                                        , variantTypes = variantTypes
+                                        }
                         )
             )
+
+
+generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGenerationModule, generationModuleImportAlias, generationModuleSuffix, useModule, generator, variantTypes } =
+    let
+        firstUseRange =
+            usedVariantOriginModule.variantsOfUses
+                |> Dict.values
+                |> List.head
+                -- not expected
+                |> Maybe.withDefault Range.emptyRange
+
+        generationModuleName =
+            [ variantOriginModuleName, ".", generationModuleSuffix ]
+                |> String.concat
+    in
+    case maybeGenerationModule of
+        Nothing ->
+            [ Rule.errorForModule useModule.key
+                { message =
+                    [ "missing generation `module ", generationModuleName, "`" ]
+                        |> String.concat
+                , details =
+                    [ "Create this elm file where variant prisms will be generated in." ]
+                }
+                firstUseRange
+            ]
+
+        Just generationModule ->
+            [ case usedVariantOriginModule.import_ of
+                Present ->
+                    []
+
+                Missing ->
+                    [ let
+                        generationModuleAlias =
+                            generationModuleImportAlias
+                                |> Maybe.map
+                                    (\alias_ ->
+                                        [ case alias_ of
+                                            OriginModule ->
+                                                variantOriginModuleName
+
+                                            OriginModuleWithSuffix aliasSuffix ->
+                                                variantOriginModuleName ++ aliasSuffix
+                                        ]
+                                    )
+
+                        importString =
+                            [ CodeGen.importStmt [ generationModuleName ] generationModuleAlias Nothing ]
+                                |> CodeGen.prettyImports
+                                |> pretty 1000
+                      in
+                      Rule.errorForModuleWithFix
+                        useModule.key
+                        { message = [ "missing `", importString, "`" ] |> String.concat
+                        , details =
+                            [ "Add the variant prism generation `module` `import` through the supplied fix." ]
+                        }
+                        firstUseRange
+                        [ [ "\n", importString ]
+                            |> String.concat
+                            |> Fix.insertAt (useModule.belowImportsColumn |> onRow 1)
+                        ]
+                    ]
+            , variantTypes
+                |> Dict.toList
+                |> List.concatMap
+                    (\( variantTypeName, variantType ) ->
+                        variantType.variants
+                            |> Dict.filter
+                                (\variantName _ ->
+                                    Dict.member variantName usedVariantOriginModule.variantsOfUses
+                                )
+                            |> Dict.toList
+                            |> List.map
+                                (\( variantName, variantValues ) ->
+                                    let
+                                        generated =
+                                            generator.build
+                                                { variantModule = variantOriginModuleName
+                                                , typeName = variantTypeName
+                                                , typeParameters = variantType.parameters
+                                                , variantName = variantName
+                                                , variantValues = variantValues
+                                                }
+                                    in
+                                    Rule.errorForModuleWithFix generationModule.key
+                                        { message =
+                                            [ "missing prism for variant `", variantName, "`" ]
+                                                |> String.concat
+                                        , details =
+                                            [ "A variant prism with this name is used in other `module`s."
+                                            , "Add the generated prism declaration through the fix."
+                                            ]
+                                        }
+                                        (generationModule.exposing_ |> Node.range)
+                                        [ [ "\n\n"
+                                          , generated.declaration
+                                                |> prismDeclarationCodeGen
+                                                |> CodeGen.prettyDeclaration 100
+                                                |> pretty 100
+                                          ]
+                                            |> String.concat
+                                            |> Fix.insertAt (generationModule.belowImportsColumn |> onRow 1)
+                                        , case generationModule.exposing_ of
+                                            Node _ (Exposing.All dotDotRange) ->
+                                                Fix.replaceRangeBy dotDotRange variantName
+
+                                            Node exposeRange (Exposing.Explicit exposes) ->
+                                                (variantName ++ ", ")
+                                                    |> Fix.insertAt
+                                                        (case exposes of
+                                                            (Node firstExposeRange _) :: _ ->
+                                                                firstExposeRange.start
+
+                                                            -- exposing () shouldn't parse
+                                                            [] ->
+                                                                exposeRange.end
+                                                        )
+                                        , [ "\n"
+                                          , [ generated.imports
+                                            , [ CodeGen.importStmt
+                                                    [ variantOriginModuleName ]
+                                                    Nothing
+                                                    ([ variantTypeName |> CodeGen.openTypeExpose ]
+                                                        |> CodeGen.exposeExplicit
+                                                        |> Just
+                                                    )
+                                              ]
+                                            ]
+                                                |> List.concat
+                                                |> CodeGen.prettyImports
+                                                |> pretty 1000
+                                          ]
+                                            |> String.concat
+                                            |> Fix.insertAt (generationModule.belowImportsColumn |> onRow 1)
+                                        ]
+                                )
+                    )
+            ]
+                |> List.concat
 
 
 prismDeclarationCodeGen : VariantPrismDeclaration -> CodeGen.Declaration
