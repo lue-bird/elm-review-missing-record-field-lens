@@ -858,7 +858,7 @@ use
 
     importGenerationModuleAsOriginModuleWithSuffix "X"
 
-Remember that elm doesn't allow `.`s in `import` aliases.
+Remember that elm doesn't [allow `.`s in `import` aliases](https://github.com/elm/compiler/issues/2260).
 
 -}
 importGenerationModuleAsOriginModuleWithSuffix : String -> Config -> Config
