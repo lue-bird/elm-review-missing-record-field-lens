@@ -1386,59 +1386,74 @@ Out of the box, there are
 You can customize existing variant prism declarations with [`withDocumentation`](#withDocumentation)
 or create a custom prism generator ([the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest), [`implementation`](#implementation) can be helpful).
 
-    customPrismGenerator : VariantPrismGenerator
-    customPrismGenerator =
-        { name = prismNameOnVariant
-        , build =
-            \{ variantName, typeName, typeParameters, variantValues } ->
-                { imports =
-                    [ importStmt [ "CustomPrism" ]
-                        Nothing
-                        (exposeExplicit
-                            [ typeOrAliasExpose "CustomPrism" ]
-                            |> Just
-                        )
-                    ]
-                , documentation =
-                    emptyDocComment
-                        |> markdown
-                            ("`CustomPrism` for the variant `" ++ variantName ++ "`.")
-                        |> Just
-                , annotation =
-                    typed "CustomPrism"
-                        [ CodeGen.typed typeName
-                            (typeParameters |> List.map CodeGen.typeVar)
-                        , case variantValues of
-                            [] ->
-                                unitAnn
+    customPrismGenerator : VariantPrismBuild
+    customPrismGenerator { variantName, typeName, typeParameters, variantValues } =
+        { imports =
+            [ importStmt [ "CustomPrism" ]
+                Nothing
+                (exposeExplicit
+                    [ typeOrAliasExpose "CustomPrism" ]
+                    |> Just
+                )
+                |> Just
+            , case variantValues of
+                [] ->
+                    Nothing
 
-                            [ singleValueType ] ->
-                                singleValueType
+                [ _ ] ->
+                    Nothing
 
-                            valueType0 :: valueType1 :: valueTypeFrom2 ->
-                                let
-                                    argumentCount =
-                                        2 + (valueTypeFrom2 |> List.length)
-                                in
-                                fqConstruct
-                                    [ "Toop" ]
-                                    ("T" ++ (argumentCount |> String.fromInt))
-                                    (valueType0 :: valueType1 :: valueTypeFrom2)
-                        ]
-                        |> Just
-                , implementation =
+                _ :: _ :: valueTypeFrom2 ->
                     let
-                        { access, alter } =
-                            implementation
-                                { variantName = variantName
-                                , variantValues = variantValues
-                                }
+                        valueCount =
+                            2 + (valueTypeFrom2 |> List.length)
                     in
-                    fqConstruct [ "CustomPrism" ] "create" [ access, alter ]
-                }
+                    importStmt [ "Toop", "T" ++ (valueCount |> String.fromInt) ]
+                        Nothing
+                        Nothing
+            ]
+                |> List.filterMap identity
+        , documentation =
+            emptyDocComment
+                |> markdown
+                    ("`CustomPrism` for the variant `" ++ variantName ++ "`.")
+                |> Just
+        , annotation =
+            typed "CustomPrism"
+                [ CodeGen.typed typeName
+                    (typeParameters |> List.map CodeGen.typeVar)
+                , case variantValues of
+                    [] ->
+                        unitAnn
+
+                    [ singleValueType ] ->
+                        singleValueType
+
+                    valueType0 :: valueType1 :: valueTypeFrom2 ->
+                        let
+                            argumentCount =
+                                2 + (valueTypeFrom2 |> List.length)
+                        in
+                        fqConstruct
+                            [ "Toop" ]
+                            ("T" ++ (argumentCount |> String.fromInt))
+                            (valueType0 :: valueType1 :: valueTypeFrom2)
+                ]
+                |> Just
+        , implementation =
+            let
+                { access, alter } =
+                    implementation
+                        { variantName = variantName
+                        , variantValues = variantValues
+                        }
+            in
+            fqConstruct [ "CustomPrism" ] "create" [ access, alter ]
         }
 
-The next step is [configuring](#Config) the prism variant name: [`withName`](#withName)
+Once you've chosen a `VariantPrismBuild`,
+you can [configure](#Config) the [prism variant `name`](#PrismVariantNameConfig)
+and after that [`inVariantOriginModuleDotSuffix`](#inVariantOriginModuleDotSuffix).
 
 -}
 type alias VariantPrismBuild =
@@ -1456,16 +1471,14 @@ type alias VariantPrismBuild =
         }
 
 
-{-| The provided [`VariantPrismGenerator`](#VariantPrismGenerator)s in this package have no documentation comment.
+{-| [Build](#VariantPrismBuild) your own documentation:
 
-You can generate your own documentation, though:
-
-    accessorsWithDocumentation { variantName } =
-        accessors { variantName = variantName }
+    accessorsWithDocumentationCustom info =
+        accessors info
             |> withDocumentation
                 (emptyDocComment
                     |> markdown
-                        ("Accessor for the variant `" ++ variantName ++ "`.")
+                        ("Accessor prism for the variant `" ++ info.variantName ++ "`.")
                 )
 
 -}
