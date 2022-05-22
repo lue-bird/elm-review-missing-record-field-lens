@@ -1,4 +1,4 @@
-module Help exposing (char0ToLower, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
+module Help exposing (beforeSuffixParser, char0ToLower, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
 
 import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
@@ -9,6 +9,7 @@ import Elm.Syntax.Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Location)
 import Elm.Syntax.TypeAnnotation as Type exposing (TypeAnnotation)
 import Elm.Type
+import Parser exposing ((|.), Parser)
 import Pretty exposing (pretty)
 
 
@@ -16,16 +17,6 @@ indexed : Int -> String -> String
 indexed index =
     \name ->
         name ++ (index |> String.fromInt)
-
-
-moduleNameToString : ModuleName -> String
-moduleNameToString =
-    String.join "."
-
-
-onRow : Int -> Int -> Location
-onRow row =
-    \column -> { column = column, row = row }
 
 
 char0ToLower : String -> String
@@ -46,6 +37,40 @@ char0Alter char0Alter_ =
 
             Just ( head, tail ) ->
                 String.cons (char0Alter_ head) tail
+
+
+beforeSuffixParser : String -> Parser String
+beforeSuffixParser suffix =
+    case suffix of
+        "" ->
+            Parser.chompWhile (\_ -> True)
+                |> Parser.getChompedString
+
+        _ ->
+            Parser.loop ""
+                (\beforeSuffixFoFar ->
+                    Parser.oneOf
+                        [ Parser.token suffix
+                            |. Parser.end
+                            |> Parser.map (\() -> Parser.Done beforeSuffixFoFar)
+                        , Parser.chompIf (\_ -> True)
+                            |> Parser.getChompedString
+                            |> Parser.map
+                                (\stillNotSuffix ->
+                                    Parser.Loop (beforeSuffixFoFar ++ stillNotSuffix)
+                                )
+                        ]
+                )
+
+
+moduleNameToString : ModuleName -> String
+moduleNameToString =
+    String.join "."
+
+
+onRow : Int -> Int -> Location
+onRow row =
+    \column -> { column = column, row = row }
 
 
 declarationToString : CodeGen.Declaration -> String

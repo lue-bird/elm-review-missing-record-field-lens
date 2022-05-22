@@ -43,7 +43,7 @@ import Elm.Syntax.Import exposing (Import)
 import Elm.Syntax.Module as Module exposing (Module)
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Range)
-import Help exposing (char0ToLower, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
+import Help exposing (beforeSuffixParser, char0ToLower, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
 import Parser exposing ((|.), (|=), Parser)
 import Review.Fix as Fix
 import Review.ModuleNameLookupTable as ModuleNameLookupTable exposing (ModuleNameLookupTable)
@@ -51,7 +51,6 @@ import Review.Project.Dependency as Dependency
 import Review.Rule as Rule exposing (Rule)
 import Set exposing (Set)
 import Stack
-import VariantPrism.GenerateUsed.Testable exposing (beforeSuffixParser)
 
 
 {-| Generate prisms for variant `type`s

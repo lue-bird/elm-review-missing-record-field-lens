@@ -1,34 +1,14 @@
 module VariantPrism.GenerateUsed.Test exposing (all)
 
-import Expect
-import Fuzz
-import Parser
 import Review.Test
 import Test exposing (Test, describe, test)
 import VariantPrism.GenerateUsed
-import VariantPrism.GenerateUsed.Testable exposing (beforeSuffixParser)
 
 
 all : Test
 all =
     describe "NoMissingVariantPrism"
-        [ Test.fuzz
-            (Fuzz.constant
-                (\baseModule generationModuleSuffix ->
-                    { baseModule = baseModule
-                    , generationModuleSuffix = generationModuleSuffix
-                    }
-                )
-                |> Fuzz.andMap Fuzz.string
-                |> Fuzz.andMap Fuzz.string
-            )
-            "beforeSuffixParser"
-            (\{ baseModule, generationModuleSuffix } ->
-                (baseModule ++ generationModuleSuffix)
-                    |> Parser.run (beforeSuffixParser generationModuleSuffix)
-                    |> Expect.equal (Ok baseModule)
-            )
-        , generates
+        [ generates
         , dontGenerate
         ]
 
