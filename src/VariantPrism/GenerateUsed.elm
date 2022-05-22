@@ -89,6 +89,697 @@ boilerplate related to updating potentially deeply nested data.
 -}
 rule : Config -> Rule
 rule config =
+    ruleImplementation config
+
+
+
+-- config
+
+
+{-| How to generate, where to generate, how to `import`.
+
+Start with
+
+  - `name :` a [`VariantPrismBuild` function](#VariantPrismBuild) like [`accessors`](#accessors)
+  - `build :` a way to handle variant prism names like [`prismNameOnVariant`](#prismNameOnVariant)
+
+```
+{ name = VariantPrism.GenerateUsed.prismNameOnVariant
+, build = VariantPrism.GenerateUsed.accessors
+}
+    |> VariantPrism.inVariantOriginModuleDotSuffix
+        "Extra.Local"
+    |> VariantPrism.importGenerationModuleAsOriginModule
+    |> VariantPrism.GenerateUsed.rule
+```
+
+  - [`inVariantOriginModuleDotSuffix "Extra.Local"`](#inVariantOriginModuleDotSuffix)
+    → prisms are generated in the `module YourVariantOriginModule.Extra.Local`
+  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModuleWithSuffix)
+    → automatic `import`s of the generation `module` `as YourVariantOriginModule`
+
+Choose what you like best:
+
+  - `import RemoteData.Variant.Generated as RemoteDataVariant`, then `RemoteDataVariant.onSuccess`?
+
+        inVariantOriginModuleDotSuffix "Variant.Generated"
+            |> importGenerationModuleAsOriginModuleWithSuffix "Variant"
+
+  - `RemoteData.Generated.onSuccess`?
+
+        inVariantOriginModuleDotSuffix "Generated"
+
+  - ...
+
+-}
+type Config
+    = Config
+        { name : VariantPrismNameConfig
+        , build : VariantPrismBuild
+        , generationModuleSuffix : String
+        , generationModuleImportAlias : Maybe GenerationModuleImportAlias
+        }
+
+
+{-| Configuration for a generation `module` `import` alias. Use
+
+  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModule)
+  - [`importGenerationModuleAsOriginModuleWithSuffix`](#importGenerationModuleAsOriginModuleWithSuffix)
+
+-}
+type GenerationModuleImportAlias
+    = OriginModule
+    | OriginModuleWithSuffix String
+
+
+{-| Generation `module`s are derived from variant origin `module`s using the configured `.Suffix`.
+
+for
+
+    module Data exposing (Data(..))
+
+with
+
+    inVariantOriginModuleDotSuffix "Extra.Local"
+
+the generation `module` is named
+
+    module Data.Extra.Local exposing (onSome)
+
+You can optionally configure aliases when `import`ing generation `module`s automatically using
+
+  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModule)
+  - [`importGenerationModuleAsOriginModuleWithSuffix`](#importGenerationModuleAsOriginModuleWithSuffix)
+
+-}
+inVariantOriginModuleDotSuffix :
+    String
+    ->
+        { name : VariantPrismNameConfig
+        , build : VariantPrismBuild
+        }
+    -> Config
+inVariantOriginModuleDotSuffix generationModuleSuffix =
+    \variantPrismConfig ->
+        { name =
+            { parser =
+                variantPrismConfig.name.parser
+                    |> Parser.map
+                        (\{ variantName } ->
+                            { variantName = variantName |> char0ToUpper }
+                        )
+            , build =
+                \variantName ->
+                    variantName
+                        |> variantPrismConfig.name.build
+                        |> char0ToLower
+            }
+        , build = variantPrismConfig.build
+        , generationModuleSuffix = generationModuleSuffix
+        , generationModuleImportAlias = Nothing
+        }
+            |> Config
+
+
+{-| When using a variant prism
+
+    DataX.onVariant
+
+To generate an automatic `import`
+
+    import Data.Extra.Local as DataX
+
+use
+
+    importGenerationModuleAsOriginModuleWithSuffix "X"
+
+Remember that elm doesn't [allow `.`s in `import` aliases](https://github.com/elm/compiler/issues/2260).
+
+-}
+importGenerationModuleAsOriginModuleWithSuffix : String -> Config -> Config
+importGenerationModuleAsOriginModuleWithSuffix generationModuleImportAliasSuffixForOriginModule =
+    \(Config config) ->
+        { config
+            | generationModuleImportAlias =
+                OriginModuleWithSuffix generationModuleImportAliasSuffixForOriginModule
+                    |> Just
+        }
+            |> Config
+
+
+{-| When using a variant prism
+
+    Data.onVariant
+
+To generate an automatic `import`
+
+    import Data.Extra.Local as Data
+
+use
+
+    importGenerationModuleAsOriginModule
+
+Remember that elm doesn't allow `.`s in `import` aliases.
+
+-}
+importGenerationModuleAsOriginModule : Config -> Config
+importGenerationModuleAsOriginModule =
+    \(Config config) ->
+        { config
+            | generationModuleImportAlias =
+                OriginModule |> Just
+        }
+            |> Config
+
+
+{-| Drop potential configured aliases when `import`ing the generation `module` automatically.
+-}
+importGenerationModuleWithoutAlias : Config -> Config
+importGenerationModuleWithoutAlias =
+    \(Config config) ->
+        { config
+            | generationModuleImportAlias = Nothing
+        }
+            |> Config
+
+
+{-| Helpers for values of a given variant in the form
+
+with
+
+    type Data a b c d
+        = Some a b c d
+        | None
+
+generates
+
+
+#### `access`
+
+    \valuesAlter variantType ->
+        case variantType of
+            Some value0 value1 value2 value3 ->
+                ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
+
+            _ ->
+                Nothing
+
+
+#### `alter`
+
+    \valuesAlter variantType ->
+        case variantType of
+            Some value0 value1 value2 value3 ->
+                let
+                    ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
+                        ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
+                in
+                Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
+
+            someNot ->
+                someNot
+
+-}
+implementation :
+    { variantName : String
+    , variantValues : List CodeGen.TypeAnnotation
+    }
+    ->
+        { access : CodeGen.Expression
+        , alter : CodeGen.Expression
+        }
+implementation { variantName, variantValues } =
+    { access =
+        CodeGen.lambda
+            [ CodeGen.varPattern "variantValuesAlter"
+            , CodeGen.varPattern "variantType"
+            ]
+            (CodeGen.caseExpr (CodeGen.val "variantType")
+                [ ( CodeGen.namedPattern variantName
+                        (variantValues
+                            |> List.indexedMap
+                                (\index _ ->
+                                    CodeGen.varPattern ("value" |> indexed index)
+                                )
+                        )
+                  , CodeGen.binOpChain
+                        (case variantValues of
+                            [] ->
+                                CodeGen.unit
+
+                            top :: down ->
+                                Stack.topDown top down
+                                    |> Stack.map
+                                        (\{ index } _ ->
+                                            CodeGen.val ("value" |> indexed index)
+                                        )
+                                    |> Stack.fold (\value soFar -> CodeGen.tuple [ soFar, value ])
+                        )
+                        CodeGen.piper
+                        [ CodeGen.fun "variantValuesAlter"
+                        , CodeGen.fun "Just"
+                        ]
+                  )
+                , ( CodeGen.allPattern
+                  , CodeGen.val "Nothing"
+                  )
+                ]
+            )
+    , alter =
+        CodeGen.lambda
+            [ CodeGen.varPattern "variantValuesAlter"
+            , CodeGen.varPattern "variantType"
+            ]
+            (CodeGen.caseExpr (CodeGen.val "variantType")
+                [ ( CodeGen.namedPattern
+                        variantName
+                        (variantValues
+                            |> List.indexedMap
+                                (\index _ ->
+                                    CodeGen.varPattern ("value" |> indexed index)
+                                )
+                        )
+                  , case variantValues of
+                        [] ->
+                            CodeGen.binOpChain
+                                CodeGen.unit
+                                CodeGen.piper
+                                [ CodeGen.fun "variantValuesAlter"
+                                , CodeGen.construct "variantValuesCurryTo"
+                                    [ CodeGen.fun variantName ]
+                                ]
+
+                        [ _ ] ->
+                            CodeGen.construct variantName
+                                [ CodeGen.construct "variantValueAlter"
+                                    [ CodeGen.val ("value" |> indexed 0) ]
+                                    |> CodeGen.parens
+                                ]
+
+                        -- >= 2
+                        element0 :: element1 :: elements2Up ->
+                            let
+                                variantValuesStack =
+                                    Stack.topDown element0 (element1 :: elements2Up)
+                            in
+                            CodeGen.letExpr
+                                [ CodeGen.letDestructuring
+                                    (variantValuesStack
+                                        |> Stack.map
+                                            (\{ index } _ ->
+                                                CodeGen.varPattern ("alteredValue" |> indexed index)
+                                            )
+                                        |> Stack.fold (\value soFar -> CodeGen.tuplePattern [ soFar, value ])
+                                    )
+                                    (CodeGen.construct "variantTagValue"
+                                        (variantValues
+                                            |> List.indexedMap
+                                                (\index _ ->
+                                                    CodeGen.val ("value" |> indexed index)
+                                                )
+                                        )
+                                    )
+                                ]
+                                (CodeGen.binOpChain
+                                    (variantValuesStack
+                                        |> Stack.map
+                                            (\{ index } _ ->
+                                                CodeGen.val ("value" |> indexed index)
+                                            )
+                                        |> Stack.fold (\value soFar -> CodeGen.tuple [ soFar, value ])
+                                    )
+                                    CodeGen.piper
+                                    [ CodeGen.fun "variantValuesAlter"
+                                    , CodeGen.construct variantName
+                                        (variantValuesStack
+                                            |> Stack.map
+                                                (\{ index } _ ->
+                                                    CodeGen.val ("alteredValue" |> indexed index)
+                                                )
+                                            |> Stack.toList
+                                        )
+                                    ]
+                                )
+                  )
+                , let
+                    variantNot =
+                        (variantName |> char0ToLower) ++ "Not"
+                  in
+                  ( CodeGen.namedPattern variantNot []
+                  , CodeGen.val variantNot
+                  )
+                ]
+            )
+    }
+
+
+{-| Named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/) which
+
+with
+
+    VariantPrism.GenerateUsed.accessors
+        |> VariantPrism.GenerateUsed.withName
+            VariantPrism.GenerateUsed.prismNameOnVariant
+        |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
+            "Extra.Local"
+        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
+
+and
+
+    module Data exposing (Data(..))
+
+    type Data a b c d
+        = Some a b c d
+        | None
+
+generates
+
+    module Data.Extra.Local exposing (onSome)
+
+    import Accessors exposing (makeOneToN_)
+    import Data exposing (Data(..))
+
+    some :
+        Relation ( a, ( b, ( c, d ) ) ) reachable wrap
+        -> Relation (Data a b c d) reachable (Maybe wrap)
+    some =
+        makeOneToN_
+            "Data.Some"
+            (\valuesAlter variantType ->
+                case variantType of
+                    Some value0 value1 value2 value3 ->
+                        ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
+
+                    _ ->
+                        Nothing
+            )
+            (\valuesAlter variantType ->
+                case variantType of
+                    Some value0 value1 value2 value3 ->
+                        let
+                            ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
+                                ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
+                        in
+                        Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
+
+                    someNot ->
+                        someNot
+            )
+
+-}
+accessors : VariantPrismBuild
+accessors =
+    \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
+        { imports =
+            [ CodeGen.importStmt [ "Accessors" ]
+                Nothing
+                ([ CodeGen.funExpose "makeOneToN_" ]
+                    |> CodeGen.exposeExplicit
+                    |> Just
+                )
+            ]
+        , documentation =
+            CodeGen.emptyDocComment
+                |> CodeGen.markdown
+                    ([ "Accessor prism for the variant `"
+                     , variantName
+                     , "` of the `type "
+                     , typeName
+                     , "`."
+                     ]
+                        |> String.concat
+                    )
+                |> Just
+        , annotation =
+            CodeGen.funAnn
+                (CodeGen.typed "Relation"
+                    [ case variantValues of
+                        [] ->
+                            CodeGen.unitAnn
+
+                        top :: down ->
+                            Stack.topDown top down
+                                |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ soFar, value ])
+                    , CodeGen.typeVar "reachable"
+                    , CodeGen.typeVar "wrap"
+                    ]
+                )
+                (CodeGen.typed "Relation"
+                    [ CodeGen.typed typeName
+                        (typeParameters |> List.map CodeGen.typeVar)
+                    , CodeGen.typeVar "reachable"
+                    , CodeGen.maybeAnn (CodeGen.typeVar "wrap")
+                    ]
+                )
+                |> Just
+        , implementation =
+            let
+                { access, alter } =
+                    implementation
+                        { variantName = variantName
+                        , variantValues = variantValues
+                        }
+            in
+            CodeGen.construct "makeOneToN_"
+                [ CodeGen.string (variantModule ++ "." ++ variantName)
+                , access
+                , alter
+                ]
+        }
+
+
+{-| How to derive prism name <=> variant name.
+
+Out of the box, there are
+
+  - [`prismNameOnVariant`](prismNameOnVariant)
+  - [`prismNameVariant`](#prismNameVariant)
+
+You can also create a custom [`VariantPrismNameConfig`](#VariantPrismNameConfig):
+
+    import Parser
+
+    { build = \{ variantName } -> variantName ++ "Variant"
+    , parser =
+        Parser.map (\variantName -> { variantName = variantName })
+            (Parser.loop ""
+                (\beforeSuffixFoFar ->
+                    Parser.oneOf
+                        [ Parser.token "Variant"
+                            |. Parser.end
+                            |> Parser.map (\() -> Parser.Done beforeSuffixFoFar)
+                        , Parser.chompIf (\_ -> True)
+                            |> Parser.getChompedString
+                            |> Parser.map
+                                (\stillNotSuffix ->
+                                    Parser.Loop (beforeSuffixFoFar ++ stillNotSuffix)
+                                )
+                        ]
+                )
+            )
+    }
+
+It's not half as daunting as it looks. If you feel motivated 👀 ↓
+
+  - a [video guide "Demystifying Parsers" by Tereza Sokol](https://m.youtube.com/watch?v=M9ulswr1z0E)
+  - an ["Introduction to the elm/parser package" by Alex Korban](https://korban.net/posts/elm/2018-09-07-introduction-elm-parser/)
+  - [the `elm/parser` package](https://dark.elm.dmy.fr/packages/elm/parser/latest/)
+
+Mini tip: testing is always a good idea for `Parser`s
+
+Don't worry about the case of the results.
+They will be automatically be corrected on [`inVariantOriginModuleDotSuffix`](#inVariantOriginModuleDotSuffix).
+
+-}
+type alias VariantPrismNameConfig =
+    { parser : Parser { variantName : String }
+    , build : { variantName : String } -> String
+    }
+
+
+{-| Handle prism names in the format `on<Variant>`.
+Check out [`VariantPrismNameConfig`](#VariantPrismNameConfig) for all naming options.
+
+    import Parser
+    import VariantPrism.GenerateUsed
+
+    "onSuccess"
+        |> Parser.run VariantPrism.GenerateUsed.prismNameOnVariant.parser
+    --> { variantName = "Success" }
+
+    { variantName = "Success" }
+        |> VariantPrism.GenerateUsed.prismOnVariant.build
+    --> "onSuccess"
+
+-}
+prismNameOnVariant : VariantPrismNameConfig
+prismNameOnVariant =
+    { build = \{ variantName } -> "on" ++ variantName
+    , parser =
+        Parser.succeed (\variantName -> { variantName = variantName })
+            |. Parser.token "on"
+            |= (Parser.chompWhile (\_ -> True)
+                    |> Parser.getChompedString
+               )
+    }
+
+
+{-| Handle prism names in the format `on<Variant>`.
+Check out [`VariantPrismNameConfig`](#VariantPrismNameConfig) for all naming options.
+
+    import Parser
+    import VariantPrism.GenerateUsed
+
+    "success"
+        |> Parser.run VariantPrism.GenerateUsed.prismNameOnVariant.parser
+    --> { variantName = "Success" }
+
+    { variantName = "Success" }
+        |> VariantPrism.GenerateUsed.prismOnVariant.build
+    --> "success"
+
+-}
+prismNameVariant : VariantPrismNameConfig
+prismNameVariant =
+    { build = \{ variantName } -> variantName |> char0ToLower
+    , parser =
+        Parser.map
+            (\variantName ->
+                { variantName = variantName |> char0ToUpper }
+            )
+            (Parser.chompWhile (\_ -> True)
+                |> Parser.getChompedString
+            )
+    }
+
+
+{-| How to generate a variant prism declaration plus the necessary `import`s.
+
+Out of the box, there are
+
+  - [`accessors`](#accessors)
+
+You can customize existing variant prism declarations with [`withDocumentation`](#withDocumentation)
+or create a custom prism generator ([the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest), [`implementation`](#implementation) can be helpful).
+
+    customPrismGenerator : VariantPrismBuild
+    customPrismGenerator { variantName, typeName, typeParameters, variantValues } =
+        { imports =
+            [ importStmt [ "CustomPrism" ]
+                Nothing
+                (exposeExplicit
+                    [ typeOrAliasExpose "CustomPrism" ]
+                    |> Just
+                )
+                |> Just
+            , case variantValues of
+                [] ->
+                    Nothing
+
+                [ _ ] ->
+                    Nothing
+
+                _ :: _ :: valueTypeFrom2 ->
+                    let
+                        valueCount =
+                            2 + (valueTypeFrom2 |> List.length)
+                    in
+                    importStmt [ "Toop", "T" ++ (valueCount |> String.fromInt) ]
+                        Nothing
+                        Nothing
+            ]
+                |> List.filterMap identity
+        , documentation =
+            emptyDocComment
+                |> markdown
+                    ("`CustomPrism` for the variant `" ++ variantName ++ "`.")
+                |> Just
+        , annotation =
+            typed "CustomPrism"
+                [ CodeGen.typed typeName
+                    (typeParameters |> List.map CodeGen.typeVar)
+                , case variantValues of
+                    [] ->
+                        unitAnn
+
+                    [ singleValueType ] ->
+                        singleValueType
+
+                    valueType0 :: valueType1 :: valueTypeFrom2 ->
+                        let
+                            argumentCount =
+                                2 + (valueTypeFrom2 |> List.length)
+                        in
+                        fqConstruct
+                            [ "Toop" ]
+                            ("T" ++ (argumentCount |> String.fromInt))
+                            (valueType0 :: valueType1 :: valueTypeFrom2)
+                ]
+                |> Just
+        , implementation =
+            let
+                { access, alter } =
+                    implementation
+                        { variantName = variantName
+                        , variantValues = variantValues
+                        }
+            in
+            fqConstruct [ "CustomPrism" ] "create" [ access, alter ]
+        }
+
+Once you've chosen a `VariantPrismBuild`,
+you can [configure](#Config) the [prism variant `name`](#PrismVariantNameConfig)
+and after that [`inVariantOriginModuleDotSuffix`](#inVariantOriginModuleDotSuffix).
+
+-}
+type alias VariantPrismBuild =
+    { variantModule : String
+    , typeName : String
+    , typeParameters : List String
+    , variantName : String
+    , variantValues : List CodeGen.TypeAnnotation
+    }
+    ->
+        { documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
+        , annotation : Maybe CodeGen.TypeAnnotation
+        , implementation : CodeGen.Expression
+        , imports : List CodeGen.Import
+        }
+
+
+{-| [Build](#VariantPrismBuild) a different documentation:
+
+    accessorsWithDocumentationCustom info =
+        accessors info
+            |> withDocumentation
+                (emptyDocComment
+                    |> markdown
+                        ("Accessor prism for the variant `" ++ info.variantName ++ "`.")
+                )
+
+-}
+withDocumentation :
+    CodeGen.Comment CodeGen.DocComment
+    ->
+        { declaration
+            | documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
+        }
+    ->
+        { declaration
+            | documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
+        }
+withDocumentation docComment generatedFieldHelper =
+    { generatedFieldHelper
+        | documentation = docComment |> Just
+    }
+
+
+
+-- implementation
+
+
+ruleImplementation : Config -> Rule
+ruleImplementation config =
     let
         (Config configuration) =
             config
@@ -814,685 +1505,3 @@ prismDeclarationToCodeGen =
             prismDeclaration.name
             []
             prismDeclaration.implementation
-
-
-
--- config
-
-
-{-| How to generate, where to generate, how to `import`.
-
-Start with
-
-  - `name :` a [`VariantPrismBuild` function](#VariantPrismBuild) like [`accessors`](#accessors)
-  - `build :` a way to handle variant prism names like [`prismNameOnVariant`](#prismNameOnVariant)
-
-```
-{ name = VariantPrism.GenerateUsed.prismNameOnVariant
-, build = VariantPrism.GenerateUsed.accessors
-}
-    |> VariantPrism.inVariantOriginModuleDotSuffix
-        "Extra.Local"
-    |> VariantPrism.importGenerationModuleAsOriginModule
-    |> VariantPrism.GenerateUsed.rule
-```
-
-  - [`inVariantOriginModuleDotSuffix "Extra.Local"`](#inVariantOriginModuleDotSuffix)
-    → prisms are generated in the `module YourVariantOriginModule.Extra.Local`
-  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModuleWithSuffix)
-    → automatic `import`s of the generation `module` `as YourVariantOriginModule`
-
-Choose what you like best:
-
-  - `import RemoteData.Variant.Generated as RemoteDataVariant`, then `RemoteDataVariant.onSuccess`?
-
-        inVariantOriginModuleDotSuffix "Variant.Generated"
-            |> importGenerationModuleAsOriginModuleWithSuffix "Variant"
-
-  - `RemoteData.Generated.onSuccess`?
-
-        inVariantOriginModuleDotSuffix "Generated"
-
-  - ...
-
--}
-type Config
-    = Config
-        { name : VariantPrismNameConfig
-        , build : VariantPrismBuild
-        , generationModuleSuffix : String
-        , generationModuleImportAlias : Maybe GenerationModuleImportAlias
-        }
-
-
-{-| Configuration for a generation `module` `import` alias. Use
-
-  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModule)
-  - [`importGenerationModuleAsOriginModuleWithSuffix`](#importGenerationModuleAsOriginModuleWithSuffix)
-
--}
-type GenerationModuleImportAlias
-    = OriginModule
-    | OriginModuleWithSuffix String
-
-
-{-| Generation `module`s are derived from variant origin `module`s using the configured `.Suffix`.
-
-for
-
-    module Data exposing (Data(..))
-
-with
-
-    inVariantOriginModuleDotSuffix "Extra.Local"
-
-the generation `module` is named
-
-    module Data.Extra.Local exposing (onSome)
-
-You can optionally configure aliases when `import`ing generation `module`s automatically using
-
-  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModule)
-  - [`importGenerationModuleAsOriginModuleWithSuffix`](#importGenerationModuleAsOriginModuleWithSuffix)
-
--}
-inVariantOriginModuleDotSuffix :
-    String
-    ->
-        { name : VariantPrismNameConfig
-        , build : VariantPrismBuild
-        }
-    -> Config
-inVariantOriginModuleDotSuffix generationModuleSuffix =
-    \variantPrismConfig ->
-        { name =
-            { parser =
-                variantPrismConfig.name.parser
-                    |> Parser.map
-                        (\{ variantName } ->
-                            { variantName = variantName |> char0ToUpper }
-                        )
-            , build =
-                \variantName ->
-                    variantName
-                        |> variantPrismConfig.name.build
-                        |> char0ToLower
-            }
-        , build = variantPrismConfig.build
-        , generationModuleSuffix = generationModuleSuffix
-        , generationModuleImportAlias = Nothing
-        }
-            |> Config
-
-
-{-| When using a variant prism
-
-    DataX.onVariant
-
-To generate an automatic `import`
-
-    import Data.Extra.Local as DataX
-
-use
-
-    importGenerationModuleAsOriginModuleWithSuffix "X"
-
-Remember that elm doesn't [allow `.`s in `import` aliases](https://github.com/elm/compiler/issues/2260).
-
--}
-importGenerationModuleAsOriginModuleWithSuffix : String -> Config -> Config
-importGenerationModuleAsOriginModuleWithSuffix generationModuleImportAliasSuffixForOriginModule =
-    \(Config config) ->
-        { config
-            | generationModuleImportAlias =
-                OriginModuleWithSuffix generationModuleImportAliasSuffixForOriginModule
-                    |> Just
-        }
-            |> Config
-
-
-{-| When using a variant prism
-
-    Data.onVariant
-
-To generate an automatic `import`
-
-    import Data.Extra.Local as Data
-
-use
-
-    importGenerationModuleAsOriginModule
-
-Remember that elm doesn't allow `.`s in `import` aliases.
-
--}
-importGenerationModuleAsOriginModule : Config -> Config
-importGenerationModuleAsOriginModule =
-    \(Config config) ->
-        { config
-            | generationModuleImportAlias =
-                OriginModule |> Just
-        }
-            |> Config
-
-
-{-| Drop potential configured aliases when `import`ing the generation `module` automatically.
--}
-importGenerationModuleWithoutAlias : Config -> Config
-importGenerationModuleWithoutAlias =
-    \(Config config) ->
-        { config
-            | generationModuleImportAlias = Nothing
-        }
-            |> Config
-
-
-{-| Helpers for values of a given variant in the form
-
-with
-
-    type Data a b c d
-        = Some a b c d
-        | None
-
-generates
-
-
-#### `access`
-
-    \valuesAlter variantType ->
-        case variantType of
-            Some value0 value1 value2 value3 ->
-                ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
-
-            _ ->
-                Nothing
-
-
-#### `alter`
-
-    \valuesAlter variantType ->
-        case variantType of
-            Some value0 value1 value2 value3 ->
-                let
-                    ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                        ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
-                in
-                Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
-
-            someNot ->
-                someNot
-
--}
-implementation :
-    { variantName : String
-    , variantValues : List CodeGen.TypeAnnotation
-    }
-    ->
-        { access : CodeGen.Expression
-        , alter : CodeGen.Expression
-        }
-implementation { variantName, variantValues } =
-    { access =
-        CodeGen.lambda
-            [ CodeGen.varPattern "variantValuesAlter"
-            , CodeGen.varPattern "variantType"
-            ]
-            (CodeGen.caseExpr (CodeGen.val "variantType")
-                [ ( CodeGen.namedPattern variantName
-                        (variantValues
-                            |> List.indexedMap
-                                (\index _ ->
-                                    CodeGen.varPattern ("value" |> indexed index)
-                                )
-                        )
-                  , CodeGen.binOpChain
-                        (case variantValues of
-                            [] ->
-                                CodeGen.unit
-
-                            top :: down ->
-                                Stack.topDown top down
-                                    |> Stack.map
-                                        (\{ index } _ ->
-                                            CodeGen.val ("value" |> indexed index)
-                                        )
-                                    |> Stack.fold (\value soFar -> CodeGen.tuple [ soFar, value ])
-                        )
-                        CodeGen.piper
-                        [ CodeGen.fun "variantValuesAlter"
-                        , CodeGen.fun "Just"
-                        ]
-                  )
-                , ( CodeGen.allPattern
-                  , CodeGen.val "Nothing"
-                  )
-                ]
-            )
-    , alter =
-        CodeGen.lambda
-            [ CodeGen.varPattern "variantValuesAlter"
-            , CodeGen.varPattern "variantType"
-            ]
-            (CodeGen.caseExpr (CodeGen.val "variantType")
-                [ ( CodeGen.namedPattern
-                        variantName
-                        (variantValues
-                            |> List.indexedMap
-                                (\index _ ->
-                                    CodeGen.varPattern ("value" |> indexed index)
-                                )
-                        )
-                  , case variantValues of
-                        [] ->
-                            CodeGen.binOpChain
-                                CodeGen.unit
-                                CodeGen.piper
-                                [ CodeGen.fun "variantValuesAlter"
-                                , CodeGen.construct "variantValuesCurryTo"
-                                    [ CodeGen.fun variantName ]
-                                ]
-
-                        [ _ ] ->
-                            CodeGen.construct variantName
-                                [ CodeGen.construct "variantValueAlter"
-                                    [ CodeGen.val ("value" |> indexed 0) ]
-                                    |> CodeGen.parens
-                                ]
-
-                        -- >= 2
-                        element0 :: element1 :: elements2Up ->
-                            let
-                                variantValuesStack =
-                                    Stack.topDown element0 (element1 :: elements2Up)
-                            in
-                            CodeGen.letExpr
-                                [ CodeGen.letDestructuring
-                                    (variantValuesStack
-                                        |> Stack.map
-                                            (\{ index } _ ->
-                                                CodeGen.varPattern ("alteredValue" |> indexed index)
-                                            )
-                                        |> Stack.fold (\value soFar -> CodeGen.tuplePattern [ soFar, value ])
-                                    )
-                                    (CodeGen.construct "variantTagValue"
-                                        (variantValues
-                                            |> List.indexedMap
-                                                (\index _ ->
-                                                    CodeGen.val ("value" |> indexed index)
-                                                )
-                                        )
-                                    )
-                                ]
-                                (CodeGen.binOpChain
-                                    (variantValuesStack
-                                        |> Stack.map
-                                            (\{ index } _ ->
-                                                CodeGen.val ("value" |> indexed index)
-                                            )
-                                        |> Stack.fold (\value soFar -> CodeGen.tuple [ soFar, value ])
-                                    )
-                                    CodeGen.piper
-                                    [ CodeGen.fun "variantValuesAlter"
-                                    , CodeGen.construct variantName
-                                        (variantValuesStack
-                                            |> Stack.map
-                                                (\{ index } _ ->
-                                                    CodeGen.val ("alteredValue" |> indexed index)
-                                                )
-                                            |> Stack.toList
-                                        )
-                                    ]
-                                )
-                  )
-                , let
-                    variantNot =
-                        (variantName |> char0ToLower) ++ "Not"
-                  in
-                  ( CodeGen.namedPattern variantNot []
-                  , CodeGen.val variantNot
-                  )
-                ]
-            )
-    }
-
-
-{-| Named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/) which
-
-with
-
-    VariantPrism.GenerateUsed.accessors
-        |> VariantPrism.GenerateUsed.withName
-            VariantPrism.GenerateUsed.prismNameOnVariant
-        |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
-            "Extra.Local"
-        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
-
-and
-
-    module Data exposing (Data(..))
-
-    type Data a b c d
-        = Some a b c d
-        | None
-
-generates
-
-    module Data.Extra.Local exposing (onSome)
-
-    import Accessors exposing (makeOneToN_)
-    import Data exposing (Data(..))
-
-    some :
-        Relation ( a, ( b, ( c, d ) ) ) reachable wrap
-        -> Relation (Data a b c d) reachable (Maybe wrap)
-    some =
-        makeOneToN_
-            "Data.Some"
-            (\valuesAlter variantType ->
-                case variantType of
-                    Some value0 value1 value2 value3 ->
-                        ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
-
-                    _ ->
-                        Nothing
-            )
-            (\valuesAlter variantType ->
-                case variantType of
-                    Some value0 value1 value2 value3 ->
-                        let
-                            ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                                ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
-                        in
-                        Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
-
-                    someNot ->
-                        someNot
-            )
-
--}
-accessors : VariantPrismBuild
-accessors =
-    \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
-        { imports =
-            [ CodeGen.importStmt [ "Accessors" ]
-                Nothing
-                ([ CodeGen.funExpose "makeOneToN_" ]
-                    |> CodeGen.exposeExplicit
-                    |> Just
-                )
-            ]
-        , documentation =
-            CodeGen.emptyDocComment
-                |> CodeGen.markdown
-                    ([ "Accessor prism for the variant `"
-                     , variantName
-                     , "` of the `type "
-                     , typeName
-                     , "`."
-                     ]
-                        |> String.concat
-                    )
-                |> Just
-        , annotation =
-            CodeGen.funAnn
-                (CodeGen.typed "Relation"
-                    [ case variantValues of
-                        [] ->
-                            CodeGen.unitAnn
-
-                        top :: down ->
-                            Stack.topDown top down
-                                |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ soFar, value ])
-                    , CodeGen.typeVar "reachable"
-                    , CodeGen.typeVar "wrap"
-                    ]
-                )
-                (CodeGen.typed "Relation"
-                    [ CodeGen.typed typeName
-                        (typeParameters |> List.map CodeGen.typeVar)
-                    , CodeGen.typeVar "reachable"
-                    , CodeGen.maybeAnn (CodeGen.typeVar "wrap")
-                    ]
-                )
-                |> Just
-        , implementation =
-            let
-                { access, alter } =
-                    implementation
-                        { variantName = variantName
-                        , variantValues = variantValues
-                        }
-            in
-            CodeGen.construct "makeOneToN_"
-                [ CodeGen.string (variantModule ++ "." ++ variantName)
-                , access
-                , alter
-                ]
-        }
-
-
-{-| How to derive prism name <=> variant name.
-
-Out of the box, there are
-
-  - [`prismNameOnVariant`](prismNameOnVariant)
-  - [`prismNameVariant`](#prismNameVariant)
-
-You can also create a custom [`VariantPrismNameConfig`](#VariantPrismNameConfig):
-
-    import Parser
-
-    { build = \{ variantName } -> variantName ++ "Variant"
-    , parser =
-        Parser.map (\variantName -> { variantName = variantName })
-            (Parser.loop ""
-                (\beforeSuffixFoFar ->
-                    Parser.oneOf
-                        [ Parser.token "Variant"
-                            |. Parser.end
-                            |> Parser.map (\() -> Parser.Done beforeSuffixFoFar)
-                        , Parser.chompIf (\_ -> True)
-                            |> Parser.getChompedString
-                            |> Parser.map
-                                (\stillNotSuffix ->
-                                    Parser.Loop (beforeSuffixFoFar ++ stillNotSuffix)
-                                )
-                        ]
-                )
-            )
-    }
-
-It's not half as daunting as it looks. If you feel motivated 👀 ↓
-
-  - a [video guide "Demystifying Parsers" by Tereza Sokol](https://m.youtube.com/watch?v=M9ulswr1z0E)
-  - an ["Introduction to the elm/parser package" by Alex Korban](https://korban.net/posts/elm/2018-09-07-introduction-elm-parser/)
-  - [the `elm/parser` package](https://dark.elm.dmy.fr/packages/elm/parser/latest/)
-
-Mini tip: testing is always a good idea for `Parser`s
-
-Don't worry about the case of the results.
-They will be automatically be corrected on [`inVariantOriginModuleDotSuffix`](#inVariantOriginModuleDotSuffix).
-
--}
-type alias VariantPrismNameConfig =
-    { parser : Parser { variantName : String }
-    , build : { variantName : String } -> String
-    }
-
-
-{-| Handle prism names in the format `on<Variant>`.
-Check out [`VariantPrismNameConfig`](#VariantPrismNameConfig) for all naming options.
-
-    import Parser
-    import VariantPrism.GenerateUsed
-
-    "onSuccess"
-        |> Parser.run VariantPrism.GenerateUsed.prismNameOnVariant.parser
-    --> { variantName = "Success" }
-
-    { variantName = "Success" }
-        |> VariantPrism.GenerateUsed.prismOnVariant.build
-    --> "onSuccess"
-
--}
-prismNameOnVariant : VariantPrismNameConfig
-prismNameOnVariant =
-    { build = \{ variantName } -> "on" ++ variantName
-    , parser =
-        Parser.succeed (\variantName -> { variantName = variantName })
-            |. Parser.token "on"
-            |= (Parser.chompWhile (\_ -> True)
-                    |> Parser.getChompedString
-               )
-    }
-
-
-{-| Handle prism names in the format `on<Variant>`.
-Check out [`VariantPrismNameConfig`](#VariantPrismNameConfig) for all naming options.
-
-    import Parser
-    import VariantPrism.GenerateUsed
-
-    "success"
-        |> Parser.run VariantPrism.GenerateUsed.prismNameOnVariant.parser
-    --> { variantName = "Success" }
-
-    { variantName = "Success" }
-        |> VariantPrism.GenerateUsed.prismOnVariant.build
-    --> "success"
-
--}
-prismNameVariant : VariantPrismNameConfig
-prismNameVariant =
-    { build = \{ variantName } -> variantName |> char0ToLower
-    , parser =
-        Parser.map
-            (\variantName ->
-                { variantName = variantName |> char0ToUpper }
-            )
-            (Parser.chompWhile (\_ -> True)
-                |> Parser.getChompedString
-            )
-    }
-
-
-{-| How to generate a variant prism declaration plus the necessary `import`s.
-
-Out of the box, there are
-
-  - [`accessors`](#accessors)
-
-You can customize existing variant prism declarations with [`withDocumentation`](#withDocumentation)
-or create a custom prism generator ([the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest), [`implementation`](#implementation) can be helpful).
-
-    customPrismGenerator : VariantPrismBuild
-    customPrismGenerator { variantName, typeName, typeParameters, variantValues } =
-        { imports =
-            [ importStmt [ "CustomPrism" ]
-                Nothing
-                (exposeExplicit
-                    [ typeOrAliasExpose "CustomPrism" ]
-                    |> Just
-                )
-                |> Just
-            , case variantValues of
-                [] ->
-                    Nothing
-
-                [ _ ] ->
-                    Nothing
-
-                _ :: _ :: valueTypeFrom2 ->
-                    let
-                        valueCount =
-                            2 + (valueTypeFrom2 |> List.length)
-                    in
-                    importStmt [ "Toop", "T" ++ (valueCount |> String.fromInt) ]
-                        Nothing
-                        Nothing
-            ]
-                |> List.filterMap identity
-        , documentation =
-            emptyDocComment
-                |> markdown
-                    ("`CustomPrism` for the variant `" ++ variantName ++ "`.")
-                |> Just
-        , annotation =
-            typed "CustomPrism"
-                [ CodeGen.typed typeName
-                    (typeParameters |> List.map CodeGen.typeVar)
-                , case variantValues of
-                    [] ->
-                        unitAnn
-
-                    [ singleValueType ] ->
-                        singleValueType
-
-                    valueType0 :: valueType1 :: valueTypeFrom2 ->
-                        let
-                            argumentCount =
-                                2 + (valueTypeFrom2 |> List.length)
-                        in
-                        fqConstruct
-                            [ "Toop" ]
-                            ("T" ++ (argumentCount |> String.fromInt))
-                            (valueType0 :: valueType1 :: valueTypeFrom2)
-                ]
-                |> Just
-        , implementation =
-            let
-                { access, alter } =
-                    implementation
-                        { variantName = variantName
-                        , variantValues = variantValues
-                        }
-            in
-            fqConstruct [ "CustomPrism" ] "create" [ access, alter ]
-        }
-
-Once you've chosen a `VariantPrismBuild`,
-you can [configure](#Config) the [prism variant `name`](#PrismVariantNameConfig)
-and after that [`inVariantOriginModuleDotSuffix`](#inVariantOriginModuleDotSuffix).
-
--}
-type alias VariantPrismBuild =
-    { variantModule : String
-    , typeName : String
-    , typeParameters : List String
-    , variantName : String
-    , variantValues : List CodeGen.TypeAnnotation
-    }
-    ->
-        { documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
-        , annotation : Maybe CodeGen.TypeAnnotation
-        , implementation : CodeGen.Expression
-        , imports : List CodeGen.Import
-        }
-
-
-{-| [Build](#VariantPrismBuild) your own documentation:
-
-    accessorsWithDocumentationCustom info =
-        accessors info
-            |> withDocumentation
-                (emptyDocComment
-                    |> markdown
-                        ("Accessor prism for the variant `" ++ info.variantName ++ "`.")
-                )
-
--}
-withDocumentation :
-    CodeGen.Comment CodeGen.DocComment
-    ->
-        { declaration
-            | documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
-        }
-    ->
-        { declaration
-            | documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
-        }
-withDocumentation docComment generatedFieldHelper =
-    { generatedFieldHelper
-        | documentation = docComment |> Just
-    }
