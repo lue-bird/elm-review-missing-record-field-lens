@@ -32,14 +32,18 @@ You find myself writing code like this?
                         )
         }
 ```
-Let's use some `fieldAlter` helpers:
+Let's define some `Field.nameAlter` helpers:
+```elm
+module Field exposing (callsAlter, projectsAlter)
+```
+then
 ```elm
 import Field
 
 ... path newInput =
     Field.projectsAlter
         (Scroll.focusMap
-            (Fillable.map
+            (Fillable.fillMap
                 (Field.callsAlter
                     (List.map
                         (Tree.elementAlter
@@ -49,19 +53,21 @@ import Field
                 )
             )
         )
+
+
 ```
-We can reduce the number of helpers by _combining the possible operations_ into a "lens":
+We can reduce the number of helpers by _combining the possible operations (access, replace, alter, name, ...)_ into a "lens":
 
 ```elm
-import Field exposing (projects, calls)
+import Field
 import Accessors exposing (over)
 import Accessors.Library exposing (onEach)
 
 ... path newInput =
-    over Field.projects
+    over Field.projects --← a "lens" for the field .projects
         (over Scroll.focus
-            (over Fillable.try
-                (over fields.calls
+            (over Hand.onFilled
+                (over Fields.calls --← a "lens" for the field .calls
                     (over onEach
                         (over (Tree.elementAt path)
                             (Tree.childPrepend newInput)
@@ -71,7 +77,7 @@ import Accessors.Library exposing (onEach)
             )
         )
 ```
-Seeing a pattern? Let's _compose_ those "lenses":
+Seeing a pattern? You can, to put the cherry on the cake, _compose_ those "lenses":
 
 ```elm
 import Field
@@ -80,7 +86,7 @@ import Accessors.Library exposing (onEach)
 
 ... path newInput =
     over
-        ((Field.projects << Scroll.focus << Fillable.onFilled)
+        ((Field.projects << Scroll.focus << Hand.onFilled)
             << Field.calls
             << onEach
             << Tree.elementAt path
@@ -88,11 +94,12 @@ import Accessors.Library exposing (onEach)
         (Tree.childPrepend newInput)
 ```
 
-Say what you want, but methods like this make your code more **readable**.
+Methods like this make your code more **readable**. Compare with the first example.
 
-→ This rule automatically generates record field lenses you use. No more painful manual labour.
+→ [`NoMissingRecordFieldLens`](NoMissingRecordFieldLens) automatically generates _record field_ lenses you use.
+No more manual labour.
 
-In the last examples, `Field.projects` & `Field.calls` will be generated in `Field.elm`
+In the last examples, `Field.projects` & `Field.calls` will be generated in `Field.elm`.
 
 ### try without installing
 
@@ -100,7 +107,7 @@ In the last examples, `Field.projects` & `Field.calls` will be generated in `Fie
 elm-review --template lue-bird/elm-review-missing-record-field-lens/example/field-accessors
 ```
 
-### configuration
+### configure
 
 ```elm
 module ReviewConfig exposing (config)
@@ -120,10 +127,10 @@ See [`Config`](NoMissingRecordFieldLens#Config)
 
 ### lenses that work out of the box
 
-- [bChiquet's elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
-- [sjorn3's elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
-- [arturopala's elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
-- [zh5's zipper](https://package.elm-lang.org/packages/z5h/zipper/latest/)
+- [bChiquet/elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
+- [sjorn3/elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
+- [arturopala/elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
+- [zh5/zipper](https://package.elm-lang.org/packages/z5h/zipper/latest/)
 
 It's also possible to generate custom lenses or to customize the generation of existing ones.
 
@@ -175,7 +182,7 @@ If this prism hasn't already been created, it will automatically be generated.
 elm-review --template lue-bird/elm-review-missing-record-field-lens/example/variant-accessors
 ```
 
-### configuration
+### configure
 
 ```elm
 module ReviewConfig exposing (config)
@@ -196,7 +203,7 @@ config =
 
 ### prisms that work out of the box
 
-- [erlandsona's elm-accessors](https://package.elm-lang.org/packages/erlandsona/elm-accessors/latest)
+- [erlandsona/elm-accessors](https://package.elm-lang.org/packages/erlandsona/elm-accessors/latest)
 
 It's also possible to generate custom lenses or to customize the generation of existing ones.
 
