@@ -1321,7 +1321,8 @@ type alias VariantPrismNameConfig =
     }
 
 
-{-| Handle prism names in the format `on<Variant>`. [Configure](#Config) using [`withName`](#withName).
+{-| Handle prism names in the format `on<Variant>`.
+Check out [`VariantPrismNameConfig`](#VariantPrismNameConfig) for all naming options.
 
     import Parser
     import VariantPrism.GenerateUsed
@@ -1347,7 +1348,8 @@ prismNameOnVariant =
     }
 
 
-{-| Handle prism names in the format `on<Variant>`. Configure using [`withName`](#withName).
+{-| Handle prism names in the format `on<Variant>`.
+Check out [`VariantPrismNameConfig`](#VariantPrismNameConfig) for all naming options.
 
     import Parser
     import VariantPrism.GenerateUsed
