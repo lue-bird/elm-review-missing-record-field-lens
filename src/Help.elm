@@ -1,12 +1,15 @@
-module Help exposing (char0ToLower, indexed, metaToVariantType, moduleNameToString, onRow)
+module Help exposing (char0ToLower, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
 
 import Dict exposing (Dict)
+import Elm.CodeGen as CodeGen
 import Elm.Docs
+import Elm.Pretty as CodeGen
 import Elm.Syntax.ModuleName exposing (ModuleName)
 import Elm.Syntax.Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Location)
 import Elm.Syntax.TypeAnnotation as Type exposing (TypeAnnotation)
 import Elm.Type
+import Pretty exposing (pretty)
 
 
 indexed : Int -> String -> String
@@ -43,6 +46,22 @@ char0Alter char0Alter_ =
 
             Just ( head, tail ) ->
                 String.cons (char0Alter_ head) tail
+
+
+declarationToString : CodeGen.Declaration -> String
+declarationToString =
+    \declaration ->
+        declaration
+            |> CodeGen.prettyDeclaration 100
+            |> pretty 100
+
+
+importsToString : List CodeGen.Import -> String
+importsToString =
+    \imports ->
+        imports
+            |> CodeGen.prettyImports
+            |> pretty 1000
 
 
 metaToType : Elm.Type.Type -> TypeAnnotation

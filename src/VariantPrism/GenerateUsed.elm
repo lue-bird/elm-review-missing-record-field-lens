@@ -36,7 +36,6 @@ module VariantPrism.GenerateUsed exposing
 import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
 import Elm.Docs as Meta
-import Elm.Pretty as CodeGen
 import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.Exposing as Exposing exposing (Exposing)
 import Elm.Syntax.Expression as Expression exposing (Expression)
@@ -44,9 +43,8 @@ import Elm.Syntax.Import exposing (Import)
 import Elm.Syntax.Module as Module exposing (Module)
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Range)
-import Help exposing (char0ToLower, indexed, metaToVariantType, moduleNameToString, onRow)
+import Help exposing (char0ToLower, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
 import Parser exposing ((|.), (|=), Parser)
-import Pretty exposing (pretty)
 import Review.Fix as Fix
 import Review.ModuleNameLookupTable as ModuleNameLookupTable exposing (ModuleNameLookupTable)
 import Review.Project.Dependency as Dependency
@@ -166,9 +164,7 @@ type alias ProjectContext =
             (Dict
                 String
                 { variants :
-                    Dict
-                        String
-                        (List CodeGen.TypeAnnotation)
+                    Dict String (List CodeGen.TypeAnnotation)
                 , parameters : List String
                 }
             )
@@ -179,7 +175,7 @@ type alias ProjectContext =
             , belowImportsColumn : Int
             , uses :
                 Dict
-                    -- by base module without the generationModuleSuffix
+                    -- by variant origin module without the generation module suffix
                     String
                     { import_ : Presence
                     , variantsOfUses : Dict String Range
@@ -187,10 +183,9 @@ type alias ProjectContext =
             }
     , generationModules :
         Dict
-            -- by base module without the generationModuleSuffix
+            -- by variant origin module without the generation module suffix
             String
-            { -- the location to insert exposed prisms
-              exposing_ : Node Exposing
+            { exposing_ : Node Exposing
             , -- the location to insert possible declarations first, then `import`s
               belowImportsColumn : Int
             , available : Set String
@@ -209,30 +204,23 @@ type ModuleContext
         { moduleOriginLookup : ModuleNameLookupTable
         , uses :
             Dict
-                -- by base module without the generationModuleSuffix
+                -- by variant origin module without the generation module suffix
                 String
                 (Dict String Range)
         , variantTypes :
             Dict
                 String
-                { variants :
-                    Dict
-                        String
-                        { range : Range
-                        , values : List CodeGen.TypeAnnotation
-                        }
+                { variants : Dict String (List CodeGen.TypeAnnotation)
                 , parameters : List String
                 }
-
-        -- the location to insert possible declarations first, then `import`s
-        , belowImportsColumn : Int
+        , -- the location to insert possible declarations first, then `import`s
+          belowImportsColumn : Int
         , importedModules : Set String
         }
     | GenerationModuleContext
         { originModule : String
         , available : Set String
-        , -- the location to insert exposed prisms
-          exposing_ : Node Exposing
+        , exposing_ : Node Exposing
         , -- the location to insert possible declarations first, then `import`s
           belowImportsColumn : Int
         }
@@ -549,11 +537,7 @@ declarationToVariantType :
         Maybe
             ( String
             , { variants :
-                    Dict
-                        String
-                        { range : Range
-                        , values : List CodeGen.TypeAnnotation
-                        }
+                    Dict String (List CodeGen.TypeAnnotation)
               , parameters : List String
               }
             )
@@ -578,13 +562,10 @@ declarationToVariantType =
                           , variants =
                                 (variant0 :: variant1 :: variantsFrom2)
                                     |> List.map
-                                        (\(Node variantRange variant) ->
+                                        (\(Node _ variant) ->
                                             ( variant.name |> Node.value
-                                            , { values =
-                                                    variant.arguments
-                                                        |> List.map Node.value
-                                              , range = variantRange
-                                              }
+                                            , variant.arguments
+                                                |> List.map Node.value
                                             )
                                         )
                                     |> Dict.fromList
@@ -624,7 +605,8 @@ generateForProject { context, generator, generationModuleSuffix, generationModul
                                         , variantOriginModuleName = variantOriginModuleName
                                         , generationModuleImportAlias = generationModuleImportAlias
                                         , generationModuleSuffix = generationModuleSuffix
-                                        , useModule = useModule
+                                        , useModuleKey = useModule.key
+                                        , useModuleBelowImportsColumn = useModule.belowImportsColumn
                                         , generator = generator
                                         , variantTypes = variantTypes
                                         }
@@ -632,7 +614,31 @@ generateForProject { context, generator, generationModuleSuffix, generationModul
             )
 
 
-generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGenerationModule, generationModuleImportAlias, generationModuleSuffix, useModule, generator, variantTypes } =
+generateForModule :
+    { usedVariantOriginModule : { variantsOfUses : Dict String Range, import_ : Presence }
+    , useModuleKey : Rule.ModuleKey
+    , useModuleBelowImportsColumn : Int
+    , variantOriginModuleName : String
+    , maybeGenerationModule :
+        Maybe
+            { exposing_ : Node Exposing
+            , -- the location to insert possible declarations first, then `import`s
+              belowImportsColumn : Int
+            , available : Set String
+            , key : Rule.ModuleKey
+            }
+    , variantTypes :
+        Dict
+            String
+            { variants : Dict String (List CodeGen.TypeAnnotation)
+            , parameters : List String
+            }
+    , generationModuleImportAlias : Maybe GenerationModuleImportAlias
+    , generationModuleSuffix : String
+    , generator : VariantPrismGenerator
+    }
+    -> List (Rule.Error errorScope_)
+generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGenerationModule, generationModuleImportAlias, generationModuleSuffix, useModuleBelowImportsColumn, generator, variantTypes, useModuleKey } =
     let
         firstUseRange =
             usedVariantOriginModule.variantsOfUses
@@ -647,7 +653,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
     in
     case maybeGenerationModule of
         Nothing ->
-            [ Rule.errorForModule useModule.key
+            [ Rule.errorForModule useModuleKey
                 { message =
                     [ "missing generation `module ", generationModuleName, "`" ]
                         |> String.concat
@@ -679,11 +685,10 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
 
                         importString =
                             [ CodeGen.importStmt [ generationModuleName ] generationModuleAlias Nothing ]
-                                |> CodeGen.prettyImports
-                                |> pretty 1000
+                                |> importsToString
                       in
                       Rule.errorForModuleWithFix
-                        useModule.key
+                        useModuleKey
                         { message = [ "missing `", importString, "`" ] |> String.concat
                         , details =
                             [ "Add the variant prism generation `module` `import` through the supplied fix." ]
@@ -691,7 +696,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                         firstUseRange
                         [ [ "\n", importString ]
                             |> String.concat
-                            |> Fix.insertAt (useModule.belowImportsColumn |> onRow 1)
+                            |> Fix.insertAt (useModuleBelowImportsColumn |> onRow 1)
                         ]
                     ]
             , variantTypes
@@ -702,6 +707,10 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                             |> Dict.filter
                                 (\variantName _ ->
                                     Dict.member variantName usedVariantOriginModule.variantsOfUses
+                                )
+                            |> Dict.filter
+                                (\variantName _ ->
+                                    Set.member variantName generationModule.available |> not
                                 )
                             |> Dict.toList
                             |> List.map
@@ -726,14 +735,12 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                                             ]
                                         }
                                         (generationModule.exposing_ |> Node.range)
-                                        [ [ "\n\n"
-                                          , generated.declaration
-                                                |> prismDeclarationCodeGen
-                                                |> CodeGen.prettyDeclaration 100
-                                                |> pretty 100
-                                          ]
-                                            |> String.concat
-                                            |> Fix.insertAt (generationModule.belowImportsColumn |> onRow 1)
+                                        [ Fix.insertAt (generationModule.belowImportsColumn |> onRow 1)
+                                            ([ "\n\n"
+                                             , generated.declaration |> prismDeclarationToCodeGen |> declarationToString
+                                             ]
+                                                |> String.concat
+                                            )
                                         , case generationModule.exposing_ of
                                             Node _ (Exposing.All dotDotRange) ->
                                                 Fix.replaceRangeBy dotDotRange variantName
@@ -749,23 +756,23 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                                                             [] ->
                                                                 exposeRange.end
                                                         )
-                                        , [ "\n"
-                                          , [ generated.imports
-                                            , [ CodeGen.importStmt
+                                        , Fix.insertAt (generationModule.belowImportsColumn |> onRow 1)
+                                            ([ "\n"
+                                             , [ generated.imports
+                                               , [ CodeGen.importStmt
                                                     [ variantOriginModuleName ]
                                                     Nothing
                                                     ([ variantTypeName |> CodeGen.openTypeExpose ]
                                                         |> CodeGen.exposeExplicit
                                                         |> Just
                                                     )
-                                              ]
-                                            ]
+                                                 ]
+                                               ]
                                                 |> List.concat
-                                                |> CodeGen.prettyImports
-                                                |> pretty 1000
-                                          ]
-                                            |> String.concat
-                                            |> Fix.insertAt (generationModule.belowImportsColumn |> onRow 1)
+                                                |> importsToString
+                                             ]
+                                                |> String.concat
+                                            )
                                         ]
                                 )
                     )
@@ -773,8 +780,8 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                 |> List.concat
 
 
-prismDeclarationCodeGen : VariantPrismDeclaration -> CodeGen.Declaration
-prismDeclarationCodeGen =
+prismDeclarationToCodeGen : VariantPrismDeclaration -> CodeGen.Declaration
+prismDeclarationToCodeGen =
     \prismDeclaration ->
         CodeGen.funDecl
             prismDeclaration.documentation
