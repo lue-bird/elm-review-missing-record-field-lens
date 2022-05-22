@@ -3,8 +3,11 @@ module VariantPrism.GenerateUsed exposing
     , Config(..)
     , inVariantOriginModuleDotSuffix
     , GenerationModuleImportAlias, importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleAsOriginModule, importGenerationModuleWithoutAlias
+    , VariantPrismBuild
     , accessors
-    , VariantPrismGenerator, VariantPrismDeclaration, implementation, withDocumentation, withName, prismNameOnVariantParser
+    , withDocumentation
+    , implementation
+    , VariantPrismNameConfig, prismNameVariant, prismNameOnVariant
     )
 
 {-|
@@ -19,17 +22,17 @@ module VariantPrism.GenerateUsed exposing
 @docs GenerationModuleImportAlias, importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleAsOriginModule, importGenerationModuleWithoutAlias
 
 
-## generators
+## build
 
-
-### working out of the box
-
+@docs VariantPrismBuild
 @docs accessors
+@docs withDocumentation
+@docs implementation
 
 
-### custom
+## name
 
-@docs VariantPrismGenerator, VariantPrismDeclaration, implementation, withDocumentation, withName, prismNameOnVariantParser
+@docs VariantPrismNameConfig, prismNameVariant, prismNameOnVariant
 
 -}
 
@@ -43,7 +46,7 @@ import Elm.Syntax.Import exposing (Import)
 import Elm.Syntax.Module as Module exposing (Module)
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Range)
-import Help exposing (beforeSuffixParser, char0ToLower, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
+import Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
 import Parser exposing ((|.), (|=), Parser)
 import Review.Fix as Fix
 import Review.ModuleNameLookupTable as ModuleNameLookupTable exposing (ModuleNameLookupTable)
@@ -61,10 +64,12 @@ that are called from your code but aren't already defined in a dedicated `module
 
     config : List Rule
     config =
-        [ VariantPrism.GenerateUsed.accessors
-            |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
+        [ { name = VariantPrism.GenerateUsed.prismNameOnVariant
+          , build = VariantPrism.GenerateUsed.accessors
+          }
+            |> VariantPrism.inVariantOriginModuleDotSuffix
                 "Extra.Local"
-            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
+            |> VariantPrism.importGenerationModuleAsOriginModule
             |> VariantPrism.GenerateUsed.rule
         ]
 
@@ -85,7 +90,7 @@ boilerplate related to updating potentially deeply nested data.
 rule : Config -> Rule
 rule config =
     let
-        (Config { generator, generationModuleSuffix, generationModuleImportAlias }) =
+        (Config configuration) =
             config
     in
     Rule.newProjectRuleSchema
@@ -123,9 +128,11 @@ rule config =
                             ( []
                             , context
                                 |> expressionVisit
-                                    { nameParser = generator.nameParser
-                                    , generationModuleSuffix = generationModuleSuffix
-                                    , maybeGenerationModuleImportAlias = generationModuleImportAlias
+                                    { nameParser = configuration.name.parser
+                                    , generationModuleSuffix =
+                                        configuration.generationModuleSuffix
+                                    , maybeGenerationModuleImportAlias =
+                                        configuration.generationModuleImportAlias
                                     , expressionNode = expressionNode
                                     }
                             )
@@ -139,7 +146,8 @@ rule config =
             )
         |> Rule.withModuleContextUsingContextCreator
             { fromProjectToModule =
-                projectContextToModule { generationModuleSuffix = generationModuleSuffix }
+                projectContextToModule
+                    { generationModuleSuffix = configuration.generationModuleSuffix }
             , fromModuleToProject = moduleContextToProject
             , foldProjectContexts = projectContextsFold
             }
@@ -147,9 +155,12 @@ rule config =
             (\context ->
                 generateForProject
                     { context = context
-                    , generator = generator
-                    , generationModuleSuffix = generationModuleSuffix
-                    , generationModuleImportAlias = generationModuleImportAlias
+                    , name = configuration.name
+                    , build = configuration.build
+                    , generationModuleSuffix =
+                        configuration.generationModuleSuffix
+                    , generationModuleImportAlias =
+                        configuration.generationModuleImportAlias
                     }
             )
         |> Rule.fromProjectRuleSchema
@@ -389,7 +400,7 @@ importVisit importNode =
 
 
 expressionVisit :
-    { nameParser : Parser String
+    { nameParser : Parser { variantName : String }
     , generationModuleSuffix : String
     , maybeGenerationModuleImportAlias : Maybe GenerationModuleImportAlias
     , expressionNode : Node Expression
@@ -413,7 +424,7 @@ expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGener
                             Err _ ->
                                 notGenerationModuleContext
 
-                            Ok variantName ->
+                            Ok { variantName } ->
                                 let
                                     addUse originModule_ =
                                         { notGenerationModuleContext
@@ -577,13 +588,14 @@ declarationToVariantType =
 
 
 generateForProject :
-    { generator : VariantPrismGenerator
+    { name : VariantPrismNameConfig
+    , build : VariantPrismBuild
     , generationModuleSuffix : String
     , generationModuleImportAlias : Maybe GenerationModuleImportAlias
     , context : ProjectContext
     }
     -> List (Rule.Error { useErrorForModule : () })
-generateForProject { context, generator, generationModuleSuffix, generationModuleImportAlias } =
+generateForProject { context, name, build, generationModuleSuffix, generationModuleImportAlias } =
     context.useModules
         |> Dict.values
         |> List.concatMap
@@ -606,7 +618,8 @@ generateForProject { context, generator, generationModuleSuffix, generationModul
                                         , generationModuleSuffix = generationModuleSuffix
                                         , useModuleKey = useModule.key
                                         , useModuleBelowImportsColumn = useModule.belowImportsColumn
-                                        , generator = generator
+                                        , name = name
+                                        , build = build
                                         , variantTypes = variantTypes
                                         }
                         )
@@ -634,10 +647,11 @@ generateForModule :
             }
     , generationModuleImportAlias : Maybe GenerationModuleImportAlias
     , generationModuleSuffix : String
-    , generator : VariantPrismGenerator
+    , name : VariantPrismNameConfig
+    , build : VariantPrismBuild
     }
     -> List (Rule.Error errorScope_)
-generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGenerationModule, generationModuleImportAlias, generationModuleSuffix, useModuleBelowImportsColumn, generator, variantTypes, useModuleKey } =
+generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGenerationModule, generationModuleImportAlias, generationModuleSuffix, useModuleBelowImportsColumn, name, build, variantTypes, useModuleKey } =
     let
         firstUseRange =
             usedVariantOriginModule.variantsOfUses
@@ -716,7 +730,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                                 (\( variantName, variantValues ) ->
                                     let
                                         generated =
-                                            generator.build
+                                            build
                                                 { variantModule = variantOriginModuleName
                                                 , typeName = variantTypeName
                                                 , typeParameters = variantType.parameters
@@ -736,7 +750,13 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                                         (generationModule.exposing_ |> Node.range)
                                         [ Fix.insertAt (generationModule.belowImportsColumn |> onRow 1)
                                             ([ "\n\n"
-                                             , generated.declaration |> prismDeclarationToCodeGen |> declarationToString
+                                             , { name = name.build { variantName = variantName }
+                                               , documentation = generated.documentation
+                                               , annotation = generated.annotation
+                                               , implementation = generated.implementation
+                                               }
+                                                |> prismDeclarationToCodeGen
+                                                |> declarationToString
                                              ]
                                                 |> String.concat
                                             )
@@ -779,13 +799,19 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                 |> List.concat
 
 
-prismDeclarationToCodeGen : VariantPrismDeclaration -> CodeGen.Declaration
+prismDeclarationToCodeGen :
+    { name : String
+    , documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
+    , annotation : Maybe CodeGen.TypeAnnotation
+    , implementation : CodeGen.Expression
+    }
+    -> CodeGen.Declaration
 prismDeclarationToCodeGen =
     \prismDeclaration ->
         CodeGen.funDecl
             prismDeclaration.documentation
             prismDeclaration.annotation
-            (prismDeclaration.name |> char0ToLower)
+            prismDeclaration.name
             []
             prismDeclaration.implementation
 
@@ -794,15 +820,22 @@ prismDeclarationToCodeGen =
 -- config
 
 
-{-| How to generate, where to generate, how to import.
+{-| How to generate, where to generate, how to `import`.
 
-    import VariantPrism.GenerateUsed
+Start with
 
-    VariantPrism.GenerateUsed.accessors
-        |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
-            "Extra.Local"
-        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
-        |> VariantPrism.GenerateUsed.rule
+  - `name :` a [`VariantPrismBuild` function](#VariantPrismBuild) like [`accessors`](#accessors)
+  - `build :` a way to handle variant prism names like [`prismNameOnVariant`](#prismNameOnVariant)
+
+```
+{ name = VariantPrism.GenerateUsed.prismNameOnVariant
+, build = VariantPrism.GenerateUsed.accessors
+}
+    |> VariantPrism.inVariantOriginModuleDotSuffix
+        "Extra.Local"
+    |> VariantPrism.importGenerationModuleAsOriginModule
+    |> VariantPrism.GenerateUsed.rule
+```
 
   - [`inVariantOriginModuleDotSuffix "Extra.Local"`](#inVariantOriginModuleDotSuffix)
     → prisms are generated in the `module YourVariantOriginModule.Extra.Local`
@@ -825,7 +858,8 @@ Choose what you like best:
 -}
 type Config
     = Config
-        { generator : VariantPrismGenerator
+        { name : VariantPrismNameConfig
+        , build : VariantPrismBuild
         , generationModuleSuffix : String
         , generationModuleImportAlias : Maybe GenerationModuleImportAlias
         }
@@ -862,10 +896,29 @@ You can optionally configure aliases when `import`ing generation `module`s autom
   - [`importGenerationModuleAsOriginModuleWithSuffix`](#importGenerationModuleAsOriginModuleWithSuffix)
 
 -}
-inVariantOriginModuleDotSuffix : String -> VariantPrismGenerator -> Config
+inVariantOriginModuleDotSuffix :
+    String
+    ->
+        { name : VariantPrismNameConfig
+        , build : VariantPrismBuild
+        }
+    -> Config
 inVariantOriginModuleDotSuffix generationModuleSuffix =
-    \generator ->
-        { generator = generator
+    \variantPrismConfig ->
+        { name =
+            { parser =
+                variantPrismConfig.name.parser
+                    |> Parser.map
+                        (\{ variantName } ->
+                            { variantName = variantName |> char0ToUpper }
+                        )
+            , build =
+                \variantName ->
+                    variantName
+                        |> variantPrismConfig.name.build
+                        |> char0ToLower
+            }
+        , build = variantPrismConfig.build
         , generationModuleSuffix = generationModuleSuffix
         , generationModuleImportAlias = Nothing
         }
@@ -1109,6 +1162,8 @@ implementation { variantName, variantValues } =
 with
 
     VariantPrism.GenerateUsed.accessors
+        |> VariantPrism.GenerateUsed.withName
+            VariantPrism.GenerateUsed.prismNameOnVariant
         |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
             "Extra.Local"
         |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
@@ -1156,175 +1211,50 @@ generates
             )
 
 -}
-accessors : VariantPrismGenerator
+accessors : VariantPrismBuild
 accessors =
-    { nameParser = prismNameOnVariantParser
-    , build =
-        \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
-            { imports =
-                [ CodeGen.importStmt [ "Accessors" ]
-                    Nothing
-                    ([ CodeGen.funExpose "makeOneToN_" ]
-                        |> CodeGen.exposeExplicit
-                        |> Just
+    \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
+        { imports =
+            [ CodeGen.importStmt [ "Accessors" ]
+                Nothing
+                ([ CodeGen.funExpose "makeOneToN_" ]
+                    |> CodeGen.exposeExplicit
+                    |> Just
+                )
+            ]
+        , documentation =
+            CodeGen.emptyDocComment
+                |> CodeGen.markdown
+                    ([ "Accessor prism for the variant `"
+                     , variantName
+                     , "` of the `type "
+                     , typeName
+                     , "`."
+                     ]
+                        |> String.concat
                     )
-                ]
-            , declaration =
-                { documentation =
-                    CodeGen.emptyDocComment
-                        |> CodeGen.markdown
-                            ([ "Accessor prism for the variant `"
-                             , variantName
-                             , "` of the `type "
-                             , typeName
-                             , "`."
-                             ]
-                                |> String.concat
-                            )
-                        |> Just
-                , name = variantName
-                , annotation =
-                    CodeGen.funAnn
-                        (CodeGen.typed "Relation"
-                            [ case variantValues of
-                                [] ->
-                                    CodeGen.unitAnn
-
-                                top :: down ->
-                                    Stack.topDown top down
-                                        |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ soFar, value ])
-                            , CodeGen.typeVar "reachable"
-                            , CodeGen.typeVar "wrap"
-                            ]
-                        )
-                        (CodeGen.typed "Relation"
-                            [ CodeGen.typed typeName
-                                (typeParameters |> List.map CodeGen.typeVar)
-                            , CodeGen.typeVar "reachable"
-                            , CodeGen.maybeAnn (CodeGen.typeVar "wrap")
-                            ]
-                        )
-                        |> Just
-                , implementation =
-                    let
-                        { access, alter } =
-                            implementation
-                                { variantName = variantName
-                                , variantValues = variantValues
-                                }
-                    in
-                    CodeGen.construct "makeOneToN_"
-                        [ CodeGen.string (variantModule ++ "." ++ variantName)
-                        , access
-                        , alter
-                        ]
-                }
-            }
-    }
-
-
-{-|
-
-    import Parser
-    import VariantPrism.GenerateUsed
-
-    "onSuccess"
-        |> Parser.run VariantPrism.GenerateUsed.prismNameOnVariantParser
-    --> "Success"
-
--}
-prismNameOnVariantParser : Parser String
-prismNameOnVariantParser =
-    Parser.succeed identity
-        |. Parser.token "on"
-        |= (Parser.chompWhile (\_ -> True)
-                |> Parser.getChompedString
-           )
-
-
-{-| How to generate a [`VariantPrismDeclaration`](#VariantPrismDeclaration) plus the necessary `import`s.
-
-Out of the box there are lenses for
-
-  - [`elm-accessors`](#accessors)
-
-You can also create a custom one with the help of [the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest):
-
-    customVariantPrism : VariantPrismGenerator
-    customVariantPrism =
-        { nameParser = prismNameOnVariantParser
-        , build =
-            \{ ... } ->
-                { imports =
-                    [ importStmt [ "CustomPrism" ]
-                        Nothing
-                        (exposeExplicit
-                            [ typeOrAliasExpose "CustomPrism" ]
-                            |> Just
-                        )
-                    ]
-                , declaration = ...
-                }
-        }
-
-→ for `declaration`, see [`VariantPrismDeclaration`](#VariantPrismDeclaration)
-
--}
-type alias VariantPrismGenerator =
-    { nameParser : Parser String
-    , build :
-        { variantModule : String
-        , typeName : String
-        , typeParameters : List String
-        , variantName : String
-        , variantValues : List CodeGen.TypeAnnotation
-        }
-        ->
-            { declaration : VariantPrismDeclaration
-            , imports : List CodeGen.Import
-            }
-    }
-
-
-{-| All the components to build a field lens declaration:
-
-    {-| [documentation]
-    -}
-    [name] : [annotation]
-    [name] =
-        [implementation]
-
-You can customize existing `VariantPrismDeclaration`s with [`withDocumentation`](#withDocumentation) and [`withName`](#withName)
-or create custom prism ([`implementation`](#implementation) can be helpful).
-
-    customPrismDeclaration { variantName, typeName, typeParameters, variantValues } =
-        { documentation =
-            emptyDocComment
-                |> markdown
-                    ("`CustomPrism` for the variant `" ++ variantName ++ "`.")
                 |> Just
-        , name = variantName
         , annotation =
-            typed "CustomPrism"
-                [ CodeGen.typed typeName
-                    (typeParameters |> List.map CodeGen.typeVar)
-                , case variantValues of
-                    [] ->
-                        unitAnn
+            CodeGen.funAnn
+                (CodeGen.typed "Relation"
+                    [ case variantValues of
+                        [] ->
+                            CodeGen.unitAnn
 
-                    [ singleValueType ] ->
-                        singleValueType
-
-                    valueType0 :: valueType1 :: valueTypeFrom2 ->
-                        let
-                            argumentCount =
-                                2 + (valueTypeFrom2 |> List.length)
-                        in
-                        fqConstruct
-                            [ "Toop" ]
-                            ("T" ++ (argumentCount |> String.fromInt))
-                            (valueType0 :: valueType1 :: valueTypeFrom2)
-                ]
+                        top :: down ->
+                            Stack.topDown top down
+                                |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ soFar, value ])
+                    , CodeGen.typeVar "reachable"
+                    , CodeGen.typeVar "wrap"
+                    ]
+                )
+                (CodeGen.typed "Relation"
+                    [ CodeGen.typed typeName
+                        (typeParameters |> List.map CodeGen.typeVar)
+                    , CodeGen.typeVar "reachable"
+                    , CodeGen.maybeAnn (CodeGen.typeVar "wrap")
+                    ]
+                )
                 |> Just
         , implementation =
             let
@@ -1334,18 +1264,194 @@ or create custom prism ([`implementation`](#implementation) can be helpful).
                         , variantValues = variantValues
                         }
             in
-            fqConstruct [ "CustomPrism" ] "create" [ access, alter ]
+            CodeGen.construct "makeOneToN_"
+                [ CodeGen.string (variantModule ++ "." ++ variantName)
+                , access
+                , alter
+                ]
         }
 
-names will be [decapitalized](https://package.elm-lang.org/packages/elm-community/string-extra/latest/String-Extra#decapitalize).
+
+{-| How to derive prism name <=> variant name.
+
+Out of the box, there are
+
+  - [`prismNameOnVariant`](prismNameOnVariant)
+  - [`prismNameVariant`](#prismNameVariant)
+
+You can also create a custom [`VariantPrismNameConfig`](#VariantPrismNameConfig):
+
+    import Parser
+
+    { build = \{ variantName } -> variantName ++ "Variant"
+    , parser =
+        Parser.map (\variantName -> { variantName = variantName })
+            (Parser.loop ""
+                (\beforeSuffixFoFar ->
+                    Parser.oneOf
+                        [ Parser.token "Variant"
+                            |. Parser.end
+                            |> Parser.map (\() -> Parser.Done beforeSuffixFoFar)
+                        , Parser.chompIf (\_ -> True)
+                            |> Parser.getChompedString
+                            |> Parser.map
+                                (\stillNotSuffix ->
+                                    Parser.Loop (beforeSuffixFoFar ++ stillNotSuffix)
+                                )
+                        ]
+                )
+            )
+    }
+
+It's not half as daunting as it looks. If you feel motivated 👀 ↓
+
+  - a [video guide "Demystifying Parsers" by Tereza Sokol](https://m.youtube.com/watch?v=M9ulswr1z0E)
+  - an ["Introduction to the elm/parser package" by Alex Korban](https://korban.net/posts/elm/2018-09-07-introduction-elm-parser/)
+  - [the `elm/parser` package](https://dark.elm.dmy.fr/packages/elm/parser/latest/)
+
+Mini tip: testing is always a good idea for `Parser`s
+
+Don't worry about the case of the results.
+They will be automatically be corrected on [`inVariantOriginModuleDotSuffix`](#inVariantOriginModuleDotSuffix).
 
 -}
-type alias VariantPrismDeclaration =
-    { name : String
-    , documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
-    , annotation : Maybe CodeGen.TypeAnnotation
-    , implementation : CodeGen.Expression
+type alias VariantPrismNameConfig =
+    { parser : Parser { variantName : String }
+    , build : { variantName : String } -> String
     }
+
+
+{-| Handle prism names in the format `on<Variant>`. [Configure](#Config) using [`withName`](#withName).
+
+    import Parser
+    import VariantPrism.GenerateUsed
+
+    "onSuccess"
+        |> Parser.run VariantPrism.GenerateUsed.prismNameOnVariant.parser
+    --> { variantName = "Success" }
+
+    { variantName = "Success" }
+        |> VariantPrism.GenerateUsed.prismOnVariant.build
+    --> "onSuccess"
+
+-}
+prismNameOnVariant : VariantPrismNameConfig
+prismNameOnVariant =
+    { build = \{ variantName } -> "on" ++ variantName
+    , parser =
+        Parser.succeed (\variantName -> { variantName = variantName })
+            |. Parser.token "on"
+            |= (Parser.chompWhile (\_ -> True)
+                    |> Parser.getChompedString
+               )
+    }
+
+
+{-| Handle prism names in the format `on<Variant>`. Configure using [`withName`](#withName).
+
+    import Parser
+    import VariantPrism.GenerateUsed
+
+    "success"
+        |> Parser.run VariantPrism.GenerateUsed.prismNameOnVariant.parser
+    --> { variantName = "Success" }
+
+    { variantName = "Success" }
+        |> VariantPrism.GenerateUsed.prismOnVariant.build
+    --> "success"
+
+-}
+prismNameVariant : VariantPrismNameConfig
+prismNameVariant =
+    { build = \{ variantName } -> variantName |> char0ToLower
+    , parser =
+        Parser.map
+            (\variantName ->
+                { variantName = variantName |> char0ToUpper }
+            )
+            (Parser.chompWhile (\_ -> True)
+                |> Parser.getChompedString
+            )
+    }
+
+
+{-| How to generate a variant prism declaration plus the necessary `import`s.
+
+Out of the box, there are
+
+  - [`accessors`](#accessors)
+
+You can customize existing variant prism declarations with [`withDocumentation`](#withDocumentation)
+or create a custom prism generator ([the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest), [`implementation`](#implementation) can be helpful).
+
+    customPrismGenerator : VariantPrismGenerator
+    customPrismGenerator =
+        { name = prismNameOnVariant
+        , build =
+            \{ variantName, typeName, typeParameters, variantValues } ->
+                { imports =
+                    [ importStmt [ "CustomPrism" ]
+                        Nothing
+                        (exposeExplicit
+                            [ typeOrAliasExpose "CustomPrism" ]
+                            |> Just
+                        )
+                    ]
+                , documentation =
+                    emptyDocComment
+                        |> markdown
+                            ("`CustomPrism` for the variant `" ++ variantName ++ "`.")
+                        |> Just
+                , annotation =
+                    typed "CustomPrism"
+                        [ CodeGen.typed typeName
+                            (typeParameters |> List.map CodeGen.typeVar)
+                        , case variantValues of
+                            [] ->
+                                unitAnn
+
+                            [ singleValueType ] ->
+                                singleValueType
+
+                            valueType0 :: valueType1 :: valueTypeFrom2 ->
+                                let
+                                    argumentCount =
+                                        2 + (valueTypeFrom2 |> List.length)
+                                in
+                                fqConstruct
+                                    [ "Toop" ]
+                                    ("T" ++ (argumentCount |> String.fromInt))
+                                    (valueType0 :: valueType1 :: valueTypeFrom2)
+                        ]
+                        |> Just
+                , implementation =
+                    let
+                        { access, alter } =
+                            implementation
+                                { variantName = variantName
+                                , variantValues = variantValues
+                                }
+                    in
+                    fqConstruct [ "CustomPrism" ] "create" [ access, alter ]
+                }
+        }
+
+The next step is [configuring](#Config) the prism variant name: [`withName`](#withName)
+
+-}
+type alias VariantPrismBuild =
+    { variantModule : String
+    , typeName : String
+    , typeParameters : List String
+    , variantName : String
+    , variantValues : List CodeGen.TypeAnnotation
+    }
+    ->
+        { documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
+        , annotation : Maybe CodeGen.TypeAnnotation
+        , implementation : CodeGen.Expression
+        , imports : List CodeGen.Import
+        }
 
 
 {-| The provided [`VariantPrismGenerator`](#VariantPrismGenerator)s in this package have no documentation comment.
@@ -1363,30 +1469,15 @@ You can generate your own documentation, though:
 -}
 withDocumentation :
     CodeGen.Comment CodeGen.DocComment
-    -> VariantPrismDeclaration
-    -> VariantPrismDeclaration
+    ->
+        { declaration
+            | documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
+        }
+    ->
+        { declaration
+            | documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
+        }
 withDocumentation docComment generatedFieldHelper =
     { generatedFieldHelper
         | documentation = docComment |> Just
     }
-
-
-{-| Use a different name for the generated [`VariantPrismDeclaration`](#VariantPrismDeclaration).
-
-    accessorPrisms { variantName } =
-        { accessors
-            | declaration =
-                \info ->
-                    accessors.declaration info
-                        |> withName (info.variantName ++ "Prism")
-        }
-
-names will be [decapitalized](https://package.elm-lang.org/packages/elm-community/string-extra/latest/String-Extra#decapitalize).
-
--}
-withName :
-    String
-    -> VariantPrismDeclaration
-    -> VariantPrismDeclaration
-withName name fieldHelperDeclaration =
-    { fieldHelperDeclaration | name = name }

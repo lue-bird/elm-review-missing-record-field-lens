@@ -16,7 +16,9 @@ import VariantPrism.GenerateUsed
 
 config : List Rule
 config =
-    [ VariantPrism.GenerateUsed.accessors
+    [ { name = VariantPrism.GenerateUsed.prismNameOnVariant
+      , build = VariantPrism.GenerateUsed.accessors
+      }
         |> VariantPrism.inVariantOriginModuleDotSuffix
             "Extra.Local"
         |> VariantPrism.importGenerationModuleAsOriginModule

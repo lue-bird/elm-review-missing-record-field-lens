@@ -33,7 +33,9 @@ type Data a b c d
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantPrism.GenerateUsed.accessors
+                        ({ name = VariantPrism.GenerateUsed.prismNameOnVariant
+                         , build = VariantPrism.GenerateUsed.accessors
+                         }
                             |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
                                 "Extra.Local"
                             |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
@@ -120,7 +122,9 @@ use = Data.onOne
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantPrism.GenerateUsed.accessors
+                        ({ name = VariantPrism.GenerateUsed.prismNameOnVariant
+                         , build = VariantPrism.GenerateUsed.accessors
+                         }
                             |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
                                 "Extra.Local"
                             |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
@@ -145,7 +149,9 @@ use = Data.onOne
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantPrism.GenerateUsed.accessors
+                        ({ name = VariantPrism.GenerateUsed.prismNameOnVariant
+                         , build = VariantPrism.GenerateUsed.accessors
+                         }
                             |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
                                 "Extra.Local"
                             |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule

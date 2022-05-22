@@ -1,4 +1,4 @@
-module Help exposing (beforeSuffixParser, char0ToLower, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
+module Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
 
 import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
@@ -22,6 +22,11 @@ indexed index =
 char0ToLower : String -> String
 char0ToLower =
     char0Alter Char.toLower
+
+
+char0ToUpper : String -> String
+char0ToUpper =
+    char0Alter Char.toUpper
 
 
 {-| Change the case of the first letter of a string to either uppercase or
