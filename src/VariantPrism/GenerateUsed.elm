@@ -1191,11 +1191,44 @@ expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGener
                                     functionOrValueRange =
                                         expressionNode |> Node.range
 
-                                    addUse originModule_ =
+                                    possibleGenerationModule =
+                                        ModuleNameLookupTable.moduleNameAt
+                                            notGenerationModuleContext.moduleOriginLookup
+                                            functionOrValueRange
+                                            |> Maybe.withDefault qualificationSyntax
+                                            |> qualifiedSyntaxToString
+
+                                    maybeGenerationModuleOriginModule =
+                                        case possibleGenerationModule |> Parser.run (beforeSuffixParser ("." ++ generationModuleSuffix)) of
+                                            Ok originModule_ ->
+                                                originModule_ |> Just
+
+                                            Err _ ->
+                                                case maybeGenerationModuleImportAlias of
+                                                    Nothing ->
+                                                        Nothing
+
+                                                    Just OriginModule ->
+                                                        possibleGenerationModule |> Just
+
+                                                    Just (OriginModuleWithSuffix importAliasSuffix) ->
+                                                        case possibleGenerationModule |> Parser.run (beforeSuffixParser importAliasSuffix) of
+                                                            Err _ ->
+                                                                Nothing
+
+                                                            Ok originModule_ ->
+                                                                originModule_ |> Just
+                                in
+                                case maybeGenerationModuleOriginModule of
+                                    Nothing ->
+                                        notGenerationModuleContext
+
+                                    Just originModule_ ->
                                         { notGenerationModuleContext
                                             | uses =
                                                 notGenerationModuleContext.uses
-                                                    |> Dict.update originModule_
+                                                    |> Dict.update
+                                                        originModule_
                                                         (\usesSoFar ->
                                                             usesSoFar
                                                                 |> Maybe.withDefault Dict.empty
@@ -1203,33 +1236,6 @@ expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGener
                                                                 |> Just
                                                         )
                                         }
-
-                                    possibleGenerationModule =
-                                        ModuleNameLookupTable.moduleNameAt
-                                            notGenerationModuleContext.moduleOriginLookup
-                                            functionOrValueRange
-                                            |> Maybe.withDefault qualificationSyntax
-                                            |> qualifiedSyntaxToString
-                                in
-                                case possibleGenerationModule |> Parser.run (beforeSuffixParser ("." ++ generationModuleSuffix)) of
-                                    Ok originModule_ ->
-                                        addUse originModule_
-
-                                    Err _ ->
-                                        case maybeGenerationModuleImportAlias of
-                                            Nothing ->
-                                                notGenerationModuleContext
-
-                                            Just OriginModule ->
-                                                addUse possibleGenerationModule
-
-                                            Just (OriginModuleWithSuffix importAliasSuffix) ->
-                                                case possibleGenerationModule |> Parser.run (beforeSuffixParser importAliasSuffix) of
-                                                    Err _ ->
-                                                        notGenerationModuleContext
-
-                                                    Ok originModule_ ->
-                                                        addUse originModule_
 
                     _ ->
                         notGenerationModuleContext
