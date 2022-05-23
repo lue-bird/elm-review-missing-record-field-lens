@@ -751,7 +751,7 @@ type alias VariantPrismBuild =
 
 {-| [Build](#VariantPrismBuild) a different documentation:
 
-    accessorsdocumentedCustom info =
+    accessorsDocumentedCustom info =
         accessors info
             |> documented
                 (emptyDocComment
@@ -779,8 +779,8 @@ documented docCommentReplacement =
 
 {-| [Build](#VariantPrismBuild) a different type annotation:
 
-    accessorsannotatedPrism : VariantPrismBuild
-    accessorsannotatedPrism info =
+    accessorsAnnotatedPrism : VariantPrismBuild
+    accessorsAnnotatedPrism info =
         accessors info
             |> annotated
                 (typed "Prism"
@@ -825,8 +825,8 @@ annotated annotationReplacement =
 
 {-| Supply additional `import`s required for generating the declaration.
 
-    accessorsannotatedPrism : VariantPrismBuild
-    accessorsannotatedPrism info =
+    accessorsAnnotatedPrism : VariantPrismBuild
+    accessorsAnnotatedPrism info =
         accessors info
             |> annotated (typed "Prism" [ ... ])
             |> importsAdd
