@@ -5,7 +5,7 @@ module VariantPrism.GenerateUsed exposing
     , GenerationModuleImportAlias, importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleAsOriginModule, importGenerationModuleWithoutAlias
     , VariantPrismBuild
     , accessors
-    , withDocumentation, withAnnotation, importsAdd
+    , withDocumentation, annotated, importsAdd
     , implementation
     , VariantPrismNameConfig, prismNameVariant, prismNameOnVariant
     )
@@ -26,7 +26,7 @@ module VariantPrism.GenerateUsed exposing
 
 @docs VariantPrismBuild
 @docs accessors
-@docs withDocumentation, withAnnotation, importsAdd
+@docs withDocumentation, annotated, importsAdd
 @docs implementation
 
 
@@ -659,7 +659,7 @@ Out of the box, there are
 
   - [`accessors`](#accessors)
 
-You can customize existing variant prism declarations with [`withDocumentation`](#withDocumentation) and [`withAnnotation`](#withAnnotation)
+You can customize existing variant prism declarations with [`withDocumentation`](#withDocumentation) and [`annotated`](#annotated)
 or create a custom prism generator ([the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest), [`implementation`](#implementation) can be helpful).
 
     customPrismGenerator : VariantPrismBuild
@@ -779,10 +779,10 @@ withDocumentation docCommentReplacement =
 
 {-| [Build](#VariantPrismBuild) a different type annotation:
 
-    accessorsWithAnnotationPrism : VariantPrismBuild
-    accessorsWithAnnotationPrism info =
+    accessorsannotatedPrism : VariantPrismBuild
+    accessorsannotatedPrism info =
         accessors info
-            |> withAnnotation
+            |> annotated
                 (typed "Prism"
                     [ CodeGen.typed info.typeName
                         (info.typeParameters |> List.map CodeGen.typeVar)
@@ -806,7 +806,7 @@ withDocumentation docCommentReplacement =
 Make sure to [`importsAdd`](#importsAdd).
 
 -}
-withAnnotation :
+annotated :
     CodeGen.TypeAnnotation
     ->
         { declaration
@@ -816,7 +816,7 @@ withAnnotation :
         { declaration
             | annotation : Maybe CodeGen.TypeAnnotation
         }
-withAnnotation annotationReplacement =
+annotated annotationReplacement =
     \declaration ->
         { declaration
             | annotation = annotationReplacement |> Just
@@ -825,10 +825,10 @@ withAnnotation annotationReplacement =
 
 {-| Supply additional `import`s required for generating the declaration.
 
-    accessorsWithAnnotationPrism : VariantPrismBuild
-    accessorsWithAnnotationPrism info =
+    accessorsannotatedPrism : VariantPrismBuild
+    accessorsannotatedPrism info =
         accessors info
-            |> withAnnotation (typed "Prism" [ ... ])
+            |> annotated (typed "Prism" [ ... ])
             |> importsAdd
                 [ impostStmt [ "Accessors" ]
                     Nothing
