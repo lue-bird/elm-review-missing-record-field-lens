@@ -16,6 +16,7 @@
         "elm-community/list-extra": "8.5.1 <= v < 9.0.0",
         "jfmengels/elm-review": "2.6.0 <= v < 3.0.0",
         "lue-bird/elm-emptiness-typed": "5.0.1 <= v < 6.0.0",
+        "lue-bird/elm-no-record-type-alias-constructor-function": "1.0.5 <= v < 2.0.0",
         "stil4m/elm-syntax": "7.2.0 <= v < 8.0.0",
         "the-sett/elm-pretty-printer": "2.2.0 <= v < 3.0.0",
         "the-sett/elm-syntax-dsl": "5.2.0 <= v < 6.0.0"

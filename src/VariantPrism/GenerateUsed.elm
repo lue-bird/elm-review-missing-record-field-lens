@@ -48,6 +48,7 @@ import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Range)
 import Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
 import Parser exposing ((|.), (|=), Parser)
+import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Review.Fix as Fix
 import Review.ModuleNameLookupTable as ModuleNameLookupTable exposing (ModuleNameLookupTable)
 import Review.Project.Dependency as Dependency
@@ -592,9 +593,10 @@ They will be automatically be corrected on [`inVariantOriginModuleDotSuffix`](#i
 
 -}
 type alias VariantPrismNameConfig =
-    { parser : Parser { variantName : String }
-    , build : { variantName : String } -> String
-    }
+    RecordWithoutConstructorFunction
+        { parser : Parser { variantName : String }
+        , build : { variantName : String } -> String
+        }
 
 
 {-| Handle prism names in the format `on<Variant>`.
