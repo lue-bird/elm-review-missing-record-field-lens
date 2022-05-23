@@ -46,7 +46,7 @@ import Elm.Syntax.Import exposing (Import)
 import Elm.Syntax.Module as Module exposing (Module)
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Range)
-import Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
+import Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, importsToString, indexed, metaToVariantType, onRow, qualifiedSyntaxToString)
 import Parser exposing ((|.), (|=), Parser)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Review.Fix as Fix
@@ -1018,7 +1018,7 @@ projectContextToModule { generationModuleSuffix } =
         (\meta moduleOriginLookup _ ->
             let
                 moduleName =
-                    meta |> Rule.moduleNameFromMetadata |> moduleNameToString
+                    meta |> Rule.moduleNameFromMetadata |> qualifiedSyntaxToString
             in
             case moduleName |> Parser.run (beforeSuffixParser ("." ++ generationModuleSuffix)) of
                 Ok originModule_ ->
@@ -1050,7 +1050,7 @@ moduleContextToProject =
         (\meta moduleKey moduleContext ->
             let
                 moduleName =
-                    meta |> Rule.moduleNameFromMetadata |> moduleNameToString
+                    meta |> Rule.moduleNameFromMetadata |> qualifiedSyntaxToString
             in
             case moduleContext of
                 GenerationModuleContext generationModuleContext ->
@@ -1058,7 +1058,7 @@ moduleContextToProject =
                     , useModules = Dict.empty
                     , generationModules =
                         Dict.singleton
-                            (meta |> Rule.moduleNameFromMetadata |> moduleNameToString)
+                            (meta |> Rule.moduleNameFromMetadata |> qualifiedSyntaxToString)
                             { key = moduleKey
                             , exposing_ = generationModuleContext.exposing_
                             , belowImportsColumn = generationModuleContext.belowImportsColumn
@@ -1158,7 +1158,7 @@ importVisit importNode =
                                                 |> Node.value
                                                 |> .moduleName
                                                 |> Node.value
-                                                |> moduleNameToString
+                                                |> qualifiedSyntaxToString
                                             )
                             }
                        )
@@ -1180,18 +1180,17 @@ expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGener
                 generationModuleContext |> GenerationModuleContext
 
             PossibleUseModuleContext notGenerationModuleContext ->
-                let
-                    (Node range expression) =
-                        expressionNode
-                in
-                (case expression of
-                    Expression.FunctionOrValue qualification name ->
+                (case expressionNode |> Node.value of
+                    Expression.FunctionOrValue qualificationSyntax name ->
                         case name |> Parser.run nameParser of
                             Err _ ->
                                 notGenerationModuleContext
 
                             Ok { variantName } ->
                                 let
+                                    functionOrValueRange =
+                                        expressionNode |> Node.range
+
                                     addUse originModule_ =
                                         { notGenerationModuleContext
                                             | uses =
@@ -1200,47 +1199,37 @@ expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGener
                                                         (\usesSoFar ->
                                                             usesSoFar
                                                                 |> Maybe.withDefault Dict.empty
-                                                                |> Dict.insert variantName range
+                                                                |> Dict.insert variantName functionOrValueRange
                                                                 |> Just
                                                         )
                                         }
-                                in
-                                case
-                                    range
-                                        |> ModuleNameLookupTable.moduleNameAt
+
+                                    possibleGenerationModule =
+                                        ModuleNameLookupTable.moduleNameAt
                                             notGenerationModuleContext.moduleOriginLookup
-                                of
-                                    Just [] ->
-                                        notGenerationModuleContext
+                                            functionOrValueRange
+                                            |> Maybe.withDefault qualificationSyntax
+                                            |> qualifiedSyntaxToString
+                                in
+                                case possibleGenerationModule |> Parser.run (beforeSuffixParser ("." ++ generationModuleSuffix)) of
+                                    Ok originModule_ ->
+                                        addUse originModule_
 
-                                    Just (moduleOriginPart0 :: moduleOriginPartsFrom1) ->
-                                        addUse (moduleOriginPart0 :: moduleOriginPartsFrom1 |> moduleNameToString)
+                                    Err _ ->
+                                        case maybeGenerationModuleImportAlias of
+                                            Nothing ->
+                                                notGenerationModuleContext
 
-                                    -- not imported
-                                    Nothing ->
-                                        let
-                                            moduleName =
-                                                qualification |> moduleNameToString
-                                        in
-                                        case moduleName |> Parser.run (beforeSuffixParser ("." ++ generationModuleSuffix)) of
-                                            Err _ ->
-                                                case maybeGenerationModuleImportAlias of
-                                                    Nothing ->
+                                            Just OriginModule ->
+                                                addUse possibleGenerationModule
+
+                                            Just (OriginModuleWithSuffix importAliasSuffix) ->
+                                                case possibleGenerationModule |> Parser.run (beforeSuffixParser importAliasSuffix) of
+                                                    Err _ ->
                                                         notGenerationModuleContext
 
-                                                    Just OriginModule ->
-                                                        addUse moduleName
-
-                                                    Just (OriginModuleWithSuffix importAliasSuffix) ->
-                                                        case moduleName |> Parser.run (beforeSuffixParser importAliasSuffix) of
-                                                            Err _ ->
-                                                                notGenerationModuleContext
-
-                                                            Ok originModule_ ->
-                                                                addUse originModule_
-
-                                            Ok originModule_ ->
-                                                addUse originModule_
+                                                    Ok originModule_ ->
+                                                        addUse originModule_
 
                     _ ->
                         notGenerationModuleContext
@@ -1255,15 +1244,14 @@ declarationVisit declaration =
             GenerationModuleContext generationModuleContext ->
                 (case declaration of
                     Declaration.FunctionDeclaration functionDeclaration ->
+                        let
+                            (Node _ name) =
+                                functionDeclaration.declaration |> Node.value |> .name
+                        in
                         { generationModuleContext
                             | available =
                                 generationModuleContext.available
-                                    |> Set.insert
-                                        (functionDeclaration.declaration
-                                            |> Node.value
-                                            |> .name
-                                            |> Node.value
-                                        )
+                                    |> Set.insert name
                         }
 
                     _ ->
