@@ -1468,7 +1468,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                       in
                       Rule.errorForModuleWithFix
                         useModuleKey
-                        { message = [ "missing `", importString, "`" ] |> String.concat
+                        { message = [ "`", importString, "` missing" ] |> String.concat
                         , details =
                             [ "Add the variant prism generation `module` `import` through the supplied fix." ]
                         }
@@ -1495,7 +1495,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                             |> List.map
                                 (\( variantName, variantValues ) ->
                                     let
-                                        generated =
+                                        built =
                                             build
                                                 { variantModule = variantOriginModuleName
                                                 , typeName = variantTypeName
@@ -1504,9 +1504,10 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                                                 , variantValues = variantValues
                                                 }
                                     in
-                                    Rule.errorForModuleWithFix generationModule.key
+                                    Rule.errorForModuleWithFix
+                                        generationModule.key
                                         { message =
-                                            [ "missing prism for variant `", variantName, "`" ]
+                                            [ "prism for variant `", variantName, "` missing" ]
                                                 |> String.concat
                                         , details =
                                             [ "A variant prism with this name is used in other `module`s."
@@ -1514,12 +1515,13 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                                             ]
                                         }
                                         (generationModule.exposing_ |> Node.range)
-                                        [ Fix.insertAt (generationModule.belowImportsColumn |> onRow 1)
+                                        [ Fix.insertAt
+                                            (generationModule.belowImportsColumn |> onRow 1)
                                             ([ "\n\n"
                                              , { name = name.build { variantName = variantName }
-                                               , documentation = generated.documentation
-                                               , annotation = generated.annotation
-                                               , implementation = generated.implementation
+                                               , documentation = built.documentation
+                                               , annotation = built.annotation
+                                               , implementation = built.implementation
                                                }
                                                 |> prismDeclarationToCodeGen
                                                 |> declarationToString
@@ -1541,9 +1543,10 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                                                             [] ->
                                                                 exposeRange.end
                                                         )
-                                        , Fix.insertAt (generationModule.belowImportsColumn |> onRow 1)
+                                        , Fix.insertAt
+                                            (generationModule.belowImportsColumn |> onRow 1)
                                             ([ "\n"
-                                             , [ generated.imports
+                                             , [ built.imports
                                                , [ CodeGen.importStmt
                                                     [ variantOriginModuleName ]
                                                     Nothing

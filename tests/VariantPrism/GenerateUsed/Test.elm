@@ -44,7 +44,7 @@ type Data a b c d
                     |> Review.Test.expectErrorsForModules
                         [ ( "Use"
                           , [ Review.Test.error
-                                { message = "missing `import Data.Extra.Local`"
+                                { message = "`import Data.Extra.Local` missing"
                                 , details =
                                     [ "Add the variant prism generation `module` `import` through the supplied fix" ]
                                 , under = "Data.onSome"
@@ -60,7 +60,7 @@ use = Data.onSome
                           )
                         , ( "Data.Extra.Local"
                           , [ Review.Test.error
-                                { message = "missing prism for variant `Some`"
+                                { message = "prism for variant `Some` missing"
                                 , details =
                                     [ "A variant prism with this name is used in other `module`s."
                                     , "Add the generated prism declaration through the fix."
