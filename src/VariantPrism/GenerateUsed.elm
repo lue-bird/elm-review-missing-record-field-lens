@@ -5,7 +5,7 @@ module VariantPrism.GenerateUsed exposing
     , GenerationModuleImportAlias, importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleAsOriginModule, importGenerationModuleWithoutAlias
     , VariantPrismBuild
     , accessors
-    , withDocumentation, withAnnotation
+    , withDocumentation, withAnnotation, importsAdd
     , implementation
     , VariantPrismNameConfig, prismNameVariant, prismNameOnVariant
     )
@@ -26,7 +26,7 @@ module VariantPrism.GenerateUsed exposing
 
 @docs VariantPrismBuild
 @docs accessors
-@docs withDocumentation, withAnnotation
+@docs withDocumentation, withAnnotation, importsAdd
 @docs implementation
 
 
@@ -779,7 +779,8 @@ withDocumentation docCommentReplacement =
 
 {-| [Build](#VariantPrismBuild) a different type annotation:
 
-    accessorsWithDocumentationCustom info =
+    accessorsWithAnnotationPrism : VariantPrismBuild
+    accessorsWithAnnotationPrism info =
         accessors info
             |> withAnnotation
                 (typed "Prism"
@@ -802,6 +803,8 @@ withDocumentation docCommentReplacement =
                     ([ "Prism" |> typeOrAliasExpose ] |> exposingExplicit |> Just)
                 ]
 
+Make sure to [`importsAdd`](#importsAdd).
+
 -}
 withAnnotation :
     CodeGen.TypeAnnotation
@@ -817,6 +820,30 @@ withAnnotation annotationReplacement =
     \declaration ->
         { declaration
             | annotation = annotationReplacement |> Just
+        }
+
+
+{-| Supply additional `import`s required for generating the declaration.
+
+    accessorsWithAnnotationPrism : VariantPrismBuild
+    accessorsWithAnnotationPrism info =
+        accessors info
+            |> withAnnotation (typed "Prism" [ ... ])
+            |> importsAdd
+                [ impostStmt [ "Accessors" ]
+                    Nothing
+                    ([ "Prism" |> typeOrAliasExpose ] |> exposingExplicit |> Just)
+                ]
+
+-}
+importsAdd :
+    List CodeGen.Import
+    -> { declaration | imports : List CodeGen.Import }
+    -> { declaration | imports : List CodeGen.Import }
+importsAdd importsAdditional =
+    \declaration ->
+        { declaration
+            | imports = declaration.imports ++ importsAdditional
         }
 
 
