@@ -919,15 +919,7 @@ ruleImplementation config =
             }
         |> Rule.withFinalProjectEvaluation
             (\context ->
-                generateForProject
-                    { context = context
-                    , name = configuration.name
-                    , build = configuration.build
-                    , generationModuleSuffix =
-                        configuration.generationModuleSuffix
-                    , generationModuleImportAlias =
-                        configuration.generationModuleImportAlias
-                    }
+                generateForProject { context = context, config = config }
             )
         |> Rule.fromProjectRuleSchema
 
@@ -1327,15 +1319,13 @@ declarationToVariantType =
                     variant0 :: variant1 :: variantsFrom2 ->
                         ( type_.name |> Node.value
                         , { parameters =
-                                type_.generics
-                                    |> List.map Node.value
+                                type_.generics |> List.map Node.value
                           , variants =
                                 (variant0 :: variant1 :: variantsFrom2)
                                     |> List.map
                                         (\(Node _ variant) ->
                                             ( variant.name |> Node.value
-                                            , variant.arguments
-                                                |> List.map Node.value
+                                            , variant.arguments |> List.map Node.value
                                             )
                                         )
                                     |> Dict.fromList
@@ -1348,14 +1338,11 @@ declarationToVariantType =
 
 
 generateForProject :
-    { name : VariantPrismNameConfig
-    , build : VariantPrismBuild
-    , generationModuleSuffix : String
-    , generationModuleImportAlias : Maybe GenerationModuleImportAlias
+    { config : Config
     , context : ProjectContext
     }
     -> List (Rule.Error { useErrorForModule : () })
-generateForProject { context, name, build, generationModuleSuffix, generationModuleImportAlias } =
+generateForProject { context, config } =
     context.useModules
         |> Dict.values
         |> List.concatMap
@@ -1363,24 +1350,21 @@ generateForProject { context, name, build, generationModuleSuffix, generationMod
                 useModule.uses
                     |> Dict.toList
                     |> List.concatMap
-                        (\( variantOriginModuleName, usedVariantOriginModule ) ->
-                            case context.variantTypes |> Dict.get variantOriginModuleName of
+                        (\( usedVariantOriginModuleName, usedVariantOriginModule ) ->
+                            case context.variantTypes |> Dict.get usedVariantOriginModuleName of
                                 Nothing ->
                                     []
 
-                                Just variantTypes ->
+                                Just variantTypesInModule ->
                                     generateForModule
                                         { maybeGenerationModule =
-                                            context.generationModules |> Dict.get variantOriginModuleName
+                                            context.generationModules |> Dict.get usedVariantOriginModuleName
                                         , usedVariantOriginModule = usedVariantOriginModule
-                                        , variantOriginModuleName = variantOriginModuleName
-                                        , generationModuleImportAlias = generationModuleImportAlias
-                                        , generationModuleSuffix = generationModuleSuffix
+                                        , variantOriginModuleName = usedVariantOriginModuleName
+                                        , config = config
                                         , useModuleKey = useModule.key
                                         , useModuleBelowImportsColumn = useModule.belowImportsColumn
-                                        , name = name
-                                        , build = build
-                                        , variantTypes = variantTypes
+                                        , variantTypes = variantTypesInModule
                                         }
                         )
             )
@@ -1405,14 +1389,14 @@ generateForModule :
             { variants : Dict String (List CodeGen.TypeAnnotation)
             , parameters : List String
             }
-    , generationModuleImportAlias : Maybe GenerationModuleImportAlias
-    , generationModuleSuffix : String
-    , name : VariantPrismNameConfig
-    , build : VariantPrismBuild
+    , config : Config
     }
     -> List (Rule.Error errorScope_)
-generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGenerationModule, generationModuleImportAlias, generationModuleSuffix, useModuleBelowImportsColumn, name, build, variantTypes, useModuleKey } =
+generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGenerationModule, useModuleBelowImportsColumn, config, variantTypes, useModuleKey } =
     let
+        (Config configuration) =
+            config
+
         firstUseRange =
             usedVariantOriginModule.variantsOfUses
                 |> Dict.values
@@ -1421,7 +1405,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                 |> Maybe.withDefault Range.emptyRange
 
         generationModuleName =
-            [ variantOriginModuleName, ".", generationModuleSuffix ]
+            [ variantOriginModuleName, ".", configuration.generationModuleSuffix ]
                 |> String.concat
     in
     case maybeGenerationModule of
@@ -1444,7 +1428,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                 Missing ->
                     [ let
                         generationModuleAlias =
-                            generationModuleImportAlias
+                            configuration.generationModuleImportAlias
                                 |> Maybe.map
                                     (\alias_ ->
                                         [ case alias_ of
@@ -1490,7 +1474,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                                 (\( variantName, variantValues ) ->
                                     let
                                         built =
-                                            build
+                                            configuration.build
                                                 { variantModule = variantOriginModuleName
                                                 , typeName = variantTypeName
                                                 , typeParameters = variantType.parameters
@@ -1512,7 +1496,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                                         [ Fix.insertAt
                                             (generationModule.belowImportsColumn |> onRow 1)
                                             ([ "\n\n"
-                                             , { name = name.build { variantName = variantName }
+                                             , { name = configuration.name.build { variantName = variantName }
                                                , documentation = built.documentation
                                                , annotation = built.annotation
                                                , implementation = built.implementation
