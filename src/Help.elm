@@ -1,4 +1,4 @@
-module Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, importsToString, indexed, metaToVariantType, moduleNameToString, onRow)
+module Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, importsToString, indexed, metaToVariantType, onRow, qualifiedSyntaxToString)
 
 import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
@@ -57,6 +57,7 @@ beforeSuffixParser suffix =
                     Parser.oneOf
                         [ Parser.token suffix
                             |. Parser.end
+                            |> Parser.backtrackable
                             |> Parser.map (\() -> Parser.Done beforeSuffixFoFar)
                         , Parser.chompIf (\_ -> True)
                             |> Parser.getChompedString
@@ -68,8 +69,8 @@ beforeSuffixParser suffix =
                 )
 
 
-moduleNameToString : ModuleName -> String
-moduleNameToString =
+qualifiedSyntaxToString : ModuleName -> String
+qualifiedSyntaxToString =
     String.join "."
 
 
