@@ -5,7 +5,7 @@ module VariantPrism.GenerateUsed exposing
     , GenerationModuleImportAlias, importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleAsOriginModule, importGenerationModuleWithoutAlias
     , VariantPrismBuild
     , accessors
-    , withDocumentation
+    , withDocumentation, withAnnotation
     , implementation
     , VariantPrismNameConfig, prismNameVariant, prismNameOnVariant
     )
@@ -26,7 +26,7 @@ module VariantPrism.GenerateUsed exposing
 
 @docs VariantPrismBuild
 @docs accessors
-@docs withDocumentation
+@docs withDocumentation, withAnnotation
 @docs implementation
 
 
@@ -659,7 +659,7 @@ Out of the box, there are
 
   - [`accessors`](#accessors)
 
-You can customize existing variant prism declarations with [`withDocumentation`](#withDocumentation)
+You can customize existing variant prism declarations with [`withDocumentation`](#withDocumentation) and [`withAnnotation`](#withAnnotation)
 or create a custom prism generator ([the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest), [`implementation`](#implementation) can be helpful).
 
     customPrismGenerator : VariantPrismBuild
@@ -714,6 +714,8 @@ or create a custom prism generator ([the-sett's elm-syntax-dsl](https://package.
                             [ "Toop" ]
                             ("T" ++ (argumentCount |> String.fromInt))
                             (valueType0 :: valueType1 :: valueTypeFrom2)
+                , CodeGen.typeVar "wrap"
+                , CodeGen.typeVar
                 ]
                 |> Just
         , implementation =
@@ -768,10 +770,54 @@ withDocumentation :
         { declaration
             | documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
         }
-withDocumentation docComment generatedFieldHelper =
-    { generatedFieldHelper
-        | documentation = docComment |> Just
-    }
+withDocumentation docCommentReplacement =
+    \declaration ->
+        { declaration
+            | documentation = docCommentReplacement |> Just
+        }
+
+
+{-| [Build](#VariantPrismBuild) a different type annotation:
+
+    accessorsWithDocumentationCustom info =
+        accessors info
+            |> withAnnotation
+                (typed "Prism"
+                    [ CodeGen.typed info.typeName
+                        (info.typeParameters |> List.map CodeGen.typeVar)
+                    , case variantValues of
+                        [] ->
+                            CodeGen.unitAnn
+
+                        top :: down ->
+                            Stack.topDown top down
+                                |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ soFar, value ])
+                    , CodeGen.typeVar "reachable"
+                    , CodeGen.typeVar "wrap"
+                    ]
+                )
+            |> importsAdd
+                [ impostStmt [ "Accessors" ]
+                    Nothing
+                    ([ "Prism" |> typeOrAliasExpose ] |> exposingExplicit |> Just)
+                ]
+
+-}
+withAnnotation :
+    CodeGen.TypeAnnotation
+    ->
+        { declaration
+            | annotation : Maybe CodeGen.TypeAnnotation
+        }
+    ->
+        { declaration
+            | annotation : Maybe CodeGen.TypeAnnotation
+        }
+withAnnotation annotationReplacement =
+    \declaration ->
+        { declaration
+            | annotation = annotationReplacement |> Just
+        }
 
 
 
