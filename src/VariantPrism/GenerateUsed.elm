@@ -5,7 +5,7 @@ module VariantPrism.GenerateUsed exposing
     , GenerationModuleImportAlias, importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleAsOriginModule, importGenerationModuleWithoutAlias
     , VariantPrismBuild
     , accessors
-    , withDocumentation, annotated, importsAdd
+    , documented, annotated, importsAdd
     , implementation
     , VariantPrismNameConfig, prismNameVariant, prismNameOnVariant
     )
@@ -26,7 +26,7 @@ module VariantPrism.GenerateUsed exposing
 
 @docs VariantPrismBuild
 @docs accessors
-@docs withDocumentation, annotated, importsAdd
+@docs documented, annotated, importsAdd
 @docs implementation
 
 
@@ -659,7 +659,7 @@ Out of the box, there are
 
   - [`accessors`](#accessors)
 
-You can customize existing variant prism declarations with [`withDocumentation`](#withDocumentation) and [`annotated`](#annotated)
+You can customize existing variant prism declarations with [`documented`](#documented) and [`annotated`](#annotated)
 or create a custom prism generator ([the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest), [`implementation`](#implementation) can be helpful).
 
     customPrismGenerator : VariantPrismBuild
@@ -751,16 +751,16 @@ type alias VariantPrismBuild =
 
 {-| [Build](#VariantPrismBuild) a different documentation:
 
-    accessorsWithDocumentationCustom info =
+    accessorsdocumentedCustom info =
         accessors info
-            |> withDocumentation
+            |> documented
                 (emptyDocComment
                     |> markdown
                         ("Accessor prism for the variant `" ++ info.variantName ++ "`.")
                 )
 
 -}
-withDocumentation :
+documented :
     CodeGen.Comment CodeGen.DocComment
     ->
         { declaration
@@ -770,7 +770,7 @@ withDocumentation :
         { declaration
             | documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
         }
-withDocumentation docCommentReplacement =
+documented docCommentReplacement =
     \declaration ->
         { declaration
             | documentation = docCommentReplacement |> Just
