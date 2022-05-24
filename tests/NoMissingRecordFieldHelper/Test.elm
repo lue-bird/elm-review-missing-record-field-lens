@@ -53,9 +53,9 @@ name =
     name
 
 
-score : Relation score sub wrap -> Relation { record | score : score } sub wrap
+score : Lens { record | score : score } transformed score wrap
 score =
-    makeOneToOne .score (\\f r -> { r | score = f r.score })
+    makeOneToOne_ ".score" .score (\\f r -> { r | score = f r.score })
 """
                             ]
                           )
@@ -95,9 +95,9 @@ scoreAPoint =
 import Accessors exposing (Relation, makeOneToOne)
 
 
-score : Relation score sub wrap -> Relation { record | score : score } sub wrap
+score : Lens { record | score : score } transformed score wrap
 score =
-    makeOneToOne .score (\\f r -> { r | score = f r.score })
+    makeOneToOne_ ".score" .score (\\f r -> { r | score = f r.score })
 
 z =
     z
@@ -140,9 +140,10 @@ scoreAPoint =
 import Accessors exposing (Relation, makeOneToOne)
 
 
-score : Relation score sub wrap -> Relation { record | score : score } sub wrap
+score : Lens { record | score : score } transformed score wrap
 score =
-    makeOneToOne .score (\\f r -> { r | score = f r.score })
+    makeOneToOne_ ".score" .score (\\f r -> { r | score = f r.score })
+
 
 z =
     z
@@ -192,9 +193,9 @@ a =
     a
 
 
-score : Relation score sub wrap -> Relation { record | score : score } sub wrap
+score : Lens { record | score : score } transformed score wrap
 score =
-    makeOneToOne .score (\\f r -> { r | score = f r.score })
+    makeOneToOne_ ".score" .score (\\f r -> { r | score = f r.score })
 
 
 z =
@@ -215,18 +216,18 @@ declarations =
                 accessors.declaration { fieldName = "score" }
                     |> printFieldHelperDeclaration
                     |> Expect.equal
-                        """score : Relation score sub wrap -> Relation { record | score : score } sub wrap
+                        """score : Lens { record | score : score } transformed score wrap
 score =
-    makeOneToOne .score (\\f r -> { r | score = f r.score })"""
+    makeOneToOne_ ".score" .score (\\f r -> { r | score = f r.score })"""
             )
         , test "elm-monocle"
             (\() ->
                 monocle.declaration { fieldName = "score" }
                     |> printFieldHelperDeclaration
                     |> Expect.equal
-                        """score : Lens { record | score : score } score
+                        """score : Lens { record | score : score } transformed score wrap
 score =
-    { get = .score, set = \\score_ r -> { r | score = score_ } }"""
+    makeOneToOne_ ".score" .score (\\f r -> { r | score = f r.score })"""
             )
         , test "elm-fields"
             (\() ->
