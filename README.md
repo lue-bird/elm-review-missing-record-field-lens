@@ -81,12 +81,15 @@ Seeing a pattern? You can, to put the cherry on the cake, _compose_ those "lense
 
 ```elm
 import Field
+import Hand.Extra as Hand
 import Accessors exposing (over)
 import Accessors.Library exposing (onEach)
 
 ... path newInput =
     over
-        ((Field.projects << Scroll.focus << Hand.onFilled)
+        (Field.projects -- assumes some {m | projects : {s | focus : Hand}}
+            << Scroll.focus
+            << Hand.onFilled -- where type Hand = Filled {m | calls : List (Tree something)} | OtherVariant
             << Field.calls
             << onEach
             << Tree.elementAt path

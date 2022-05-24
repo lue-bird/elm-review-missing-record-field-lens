@@ -219,8 +219,8 @@ accessors =
         [ CodeGen.importStmt [ "Accessors" ]
             Nothing
             (CodeGen.exposeExplicit
-                [ CodeGen.funExpose "makeOneToOne"
-                , CodeGen.typeOrAliasExpose "Relation"
+                [ CodeGen.funExpose "makeOneToOne_"
+                , CodeGen.typeOrAliasExpose "Lens"
                 ]
                 |> Just
             )
@@ -230,28 +230,24 @@ accessors =
             { documentation = Nothing
             , name = fieldName
             , annotation =
-                let
-                    relation super =
-                        CodeGen.typed "Relation"
-                            [ super
-                            , CodeGen.typeVar "sub"
-                            , CodeGen.typeVar "wrap"
-                            ]
-                in
-                CodeGen.funAnn
-                    (relation (CodeGen.typeVar fieldName))
-                    (relation
-                        (CodeGen.extRecordAnn "record"
-                            [ ( fieldName, CodeGen.typeVar fieldName ) ]
-                        )
-                    )
+                CodeGen.typed "Lens"
+                    [ CodeGen.extRecordAnn "record"
+                        [ ( fieldName, CodeGen.typeVar fieldName ) ]
+                    , CodeGen.typeVar "transformed"
+                    , CodeGen.typeVar fieldName
+                    , CodeGen.typeVar "wrap"
+                    ]
                     |> Just
             , implementation =
                 let
                     { access, update } =
                         functionsForField fieldName
                 in
-                CodeGen.construct "makeOneToOne" [ access, update ]
+                CodeGen.construct "makeOneToOne_"
+                    [ CodeGen.string (String.cons '.' fieldName)
+                    , access
+                    , update
+                    ]
             }
     }
 
