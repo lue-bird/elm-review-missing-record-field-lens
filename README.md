@@ -158,6 +158,8 @@ It's best to keep state structure and ui requirements separate.
 
 Similarly, leaning towards a more limited, domain tailored API of types, packages, ... with strong boundaries
 will lead to easier code with stronger guarantees.
+[↑ example from "Make Data Structures" by Richard Feldman: `Doc.id` should be read-only](https://youtu.be/x1FU3e0sT1I?t=2745)
+
 Don't try to design your API around lenses.
 Only if the API interaction happens to mirror that behavior, Dōzo!
 
