@@ -55,6 +55,7 @@ import Review.Project.Dependency as Dependency
 import Review.Rule as Rule exposing (Rule)
 import Set exposing (Set)
 import Stack
+import VariantPrism.GenerateUsed.Testable exposing (prismDeclarationToCodeGen)
 
 
 {-| Generate prisms for variant `type`s
@@ -438,9 +439,9 @@ implementation { variantName, variantValues } =
 of named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/)
 which with
 
-    VariantPrism.GenerateUsed.accessors
-        |> VariantPrism.GenerateUsed.withName
-            VariantPrism.GenerateUsed.prismNameOnVariant
+    { build = VariantPrism.GenerateUsed.accessors
+    , name = VariantPrism.GenerateUsed.prismNameOnVariant
+    }
         |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
             "Extra.Local"
         |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
@@ -462,10 +463,10 @@ generates
 
     {-| Accessor prism for the variant `Some` of the `type Data`.
     -}
-    some :
+    onSome :
         Relation ( a, ( b, ( c, d ) ) ) reachable wrap
         -> Relation (Data a b c d) reachable (Maybe wrap)
-    some =
+    onSome =
         makeOneToN_
             "Data.Some"
             (\valuesAlter variantType ->
@@ -581,10 +582,10 @@ generates
 
     {-| Accessor prism for the variant `Some` of the `type Data`.
     -}
-    some :
+    onSome :
         Relation ( a, ( b, ( c, d ) ) ) reachable wrap
         -> Relation (Data a b c d) reachable (Maybe wrap)
-    some =
+    onSome =
         makeOneToN
             (\valuesAlter variantType ->
                 case variantType of
@@ -610,7 +611,7 @@ generates
 -}
 accessorsBChiquet : VariantPrismBuild
 accessorsBChiquet =
-    \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
+    \{ variantName, typeName, variantValues, typeParameters } ->
         { imports =
             [ CodeGen.importStmt [ "Accessors" ]
                 Nothing
@@ -635,24 +636,24 @@ accessorsBChiquet =
                 |> Just
         , annotation =
             CodeGen.funAnn
-                (CodeGen.typed "Relation"
-                    [ case variantValues of
+                (typeRelation
+                    (case variantValues of
                         [] ->
                             CodeGen.unitAnn
 
                         top :: down ->
                             Stack.topDown top down
                                 |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ soFar, value ])
-                    , CodeGen.typeVar "reachable"
-                    , CodeGen.typeVar "wrap"
-                    ]
+                    )
+                    (CodeGen.typeVar "reachable")
+                    (CodeGen.typeVar "wrap")
                 )
-                (CodeGen.typed "Relation"
-                    [ CodeGen.typed typeName
+                (typeRelation
+                    (CodeGen.typed typeName
                         (typeParameters |> List.map CodeGen.typeVar)
-                    , CodeGen.typeVar "reachable"
-                    , CodeGen.maybeAnn (CodeGen.typeVar "wrap")
-                    ]
+                    )
+                    (CodeGen.typeVar "reachable")
+                    (CodeGen.maybeAnn (CodeGen.typeVar "wrap"))
                 )
                 |> Just
         , implementation =
@@ -663,12 +664,17 @@ accessorsBChiquet =
                         , variantValues = variantValues
                         }
             in
-            CodeGen.construct "makeOneToN_"
-                [ CodeGen.string (variantModule ++ "." ++ variantName)
-                , access
-                , alter
-                ]
+            CodeGen.construct "makeOneToN" [ access, alter ]
         }
+
+
+typeRelation :
+    CodeGen.TypeAnnotation
+    -> CodeGen.TypeAnnotation
+    -> CodeGen.TypeAnnotation
+    -> CodeGen.TypeAnnotation
+typeRelation structure attribute wrap =
+    CodeGen.typed "Relation" [ structure, attribute, wrap ]
 
 
 {-| How to derive prism name <=> variant name.
@@ -866,10 +872,10 @@ type alias VariantPrismBuild =
     , variantValues : List CodeGen.TypeAnnotation
     }
     ->
-        { documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
+        { imports : List CodeGen.Import
+        , documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
         , annotation : Maybe CodeGen.TypeAnnotation
         , implementation : CodeGen.Expression
-        , imports : List CodeGen.Import
         }
 
 
@@ -1679,20 +1685,3 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                     )
             ]
                 |> List.concat
-
-
-prismDeclarationToCodeGen :
-    { name : String
-    , documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
-    , annotation : Maybe CodeGen.TypeAnnotation
-    , implementation : CodeGen.Expression
-    }
-    -> CodeGen.Declaration
-prismDeclarationToCodeGen =
-    \prismDeclaration ->
-        CodeGen.funDecl
-            prismDeclaration.documentation
-            prismDeclaration.annotation
-            prismDeclaration.name
-            []
-            prismDeclaration.implementation
