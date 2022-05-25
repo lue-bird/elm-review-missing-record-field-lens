@@ -113,10 +113,11 @@ type alias Config =
 
 Out of the box there are lenses for
 
-  - [`elm-accessors`](#accessors),
-  - [`elm-fields`](#fields),
-  - [`elm-monocle`](#monocle),
+  - [`erlandsona/elm-accessors`](#accessors)
+  - [`elm-fields`](#fields)
+  - [`elm-monocle`](#monocle)
   - [`zipper`](#zipper)
+  - [`bChiquet/elm-accessors`](#accessorsBChiquet)
 
 You can also create a custom one with the help of [the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest):
 
