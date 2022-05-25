@@ -1,7 +1,7 @@
 module NoMissingRecordFieldLens.Test exposing (all)
 
 import Expect
-import NoMissingRecordFieldLens exposing (accessors, fields, monocle, rule, zipper)
+import NoMissingRecordFieldLens exposing (accessors, accessorsBChiquet, fields, monocle, rule, zipper)
 import NoMissingRecordFieldLens.Internal exposing (nonExistentFieldLensNameInfo, printFieldLensDeclaration)
 import Review.Test
 import Test exposing (Test, describe, test)
@@ -47,7 +47,7 @@ scoreAPoint =
                                 |> Review.Test.whenFixed
                                     """module Accessors.Library.Fields exposing (name, score)
 
-import Accessors exposing (Relation, makeOneToOne)
+import Accessors exposing (Lens, makeOneToOne_)
 
 name =
     name
@@ -92,7 +92,7 @@ scoreAPoint =
                                 |> Review.Test.whenFixed
                                     """module Accessors.Library.Fields exposing (z, score)
 
-import Accessors exposing (Relation, makeOneToOne)
+import Accessors exposing (Lens, makeOneToOne_)
 
 
 score : Lens { record | score : score } transformed score wrap
@@ -137,13 +137,12 @@ scoreAPoint =
                                 |> Review.Test.whenFixed
                                     """module Accessors.Library.Fields exposing (z, score)
 
-import Accessors exposing (Relation, makeOneToOne)
+import Accessors exposing (Lens, makeOneToOne_)
 
 
 score : Lens { record | score : score } transformed score wrap
 score =
     makeOneToOne_ ".score" .score (\\alter record -> { record | score = record.score |> alter })
-
 
 z =
     z
@@ -187,7 +186,7 @@ scoreAPoint =
                                 |> Review.Test.whenFixed
                                     """module Accessors.Library.Fields exposing (a, z, score)
 
-import Accessors exposing (Relation, makeOneToOne)
+import Accessors exposing (Lens, makeOneToOne_)
 
 a =
     a
@@ -210,8 +209,9 @@ z =
 
 declarations : Test
 declarations =
-    describe "kinds of declarations"
-        [ test "elm-accessors"
+    Test.describe "kinds of declarations"
+        [ test
+            "erlandsona/elm-accessors"
             (\() ->
                 accessors.declaration { fieldName = "score" }
                     |> printFieldLensDeclaration
@@ -220,35 +220,48 @@ declarations =
 score =
     makeOneToOne_ ".score" .score (\\alter record -> { record | score = record.score |> alter })"""
             )
-        , test "elm-monocle"
+        , test
+            "elm-monocle"
             (\() ->
                 monocle.declaration { fieldName = "score" }
                     |> printFieldLensDeclaration
                     |> Expect.equal
-                        """score : Lens { record | score : score } transformed score wrap
+                        """score : Lens { record | score : score } score
 score =
-    makeOneToOne_ ".score" .score (\\alter record -> { record | score = record.score |> alter })"""
+    { get = .score, set = \\replacement record -> { record | score = replacement } }"""
             )
-        , test "elm-fields"
+        , test
+            "elm-fields"
             (\() ->
                 fields.declaration { fieldName = "score" }
                     |> printFieldLensDeclaration
                     |> Expect.equal
                         """score :
-    { get : { a | score : score } -> score
-    , set : score -> { b | score : score } -> { b | score : score }
+    { get : { record0 | score : score } -> score
+    , set : score -> { record1 | score : score } -> { record1 | score : score }
     }
 score =
-    { get = .score, set = \\score_ record -> { record | score = score_ } }"""
+    { get = .score, set = \\replacement record -> { record | score = replacement } }"""
             )
-        , test "zipper"
+        , test
+            "zipper"
             (\() ->
                 zipper.declaration { fieldName = "score" }
                     |> printFieldLensDeclaration
                     |> Expect.equal
                         """intoScore : Zipper { record | score : score } root -> Zipper score root
 intoScore =
-    into .score (\\score_ record -> { record | score = score_ })"""
+    into .score (\\replacement record -> { record | score = replacement })"""
+            )
+        , test
+            "bChiquet/elm-accessors"
+            (\() ->
+                accessorsBChiquet.declaration { fieldName = "score" }
+                    |> printFieldLensDeclaration
+                    |> Expect.equal
+                        """score : Relation score transformed wrap -> Relation { record | score : score } transformed wrap
+score =
+    makeOneToOne .score (\\alter record -> { record | score = record.score |> alter })"""
             )
         ]
 
