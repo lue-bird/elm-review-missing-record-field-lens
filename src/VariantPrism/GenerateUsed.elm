@@ -4,7 +4,7 @@ module VariantPrism.GenerateUsed exposing
     , inVariantOriginModuleDotSuffix
     , GenerationModuleImportAlias, importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleAsOriginModule, importGenerationModuleWithoutAlias
     , VariantPrismBuild
-    , accessors
+    , accessors, accessorsBChiquet
     , documented, annotated, importsAdd
     , implementation
     , VariantPrismNameConfig, prismNameVariant, prismNameOnVariant
@@ -25,7 +25,7 @@ module VariantPrism.GenerateUsed exposing
 ## build
 
 @docs VariantPrismBuild
-@docs accessors
+@docs accessors, accessorsBChiquet
 @docs documented, annotated, importsAdd
 @docs implementation
 
@@ -434,9 +434,9 @@ implementation { variantName, variantValues } =
     }
 
 
-{-| Named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/) which
-
-with
+{-| [`VariantPrismBuild`](#VariantPrismBuild)
+of named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/)
+which with
 
     VariantPrism.GenerateUsed.accessors
         |> VariantPrism.GenerateUsed.withName
@@ -460,6 +460,8 @@ generates
     import Accessors exposing (makeOneToN_)
     import Data exposing (Data(..))
 
+    {-| Accessor prism for the variant `Some` of the `type Data`.
+    -}
     some :
         Relation ( a, ( b, ( c, d ) ) ) reachable wrap
         -> Relation (Data a b c d) reachable (Maybe wrap)
@@ -494,7 +496,127 @@ accessors =
         { imports =
             [ CodeGen.importStmt [ "Accessors" ]
                 Nothing
-                ([ CodeGen.funExpose "makeOneToN_" ]
+                ([ CodeGen.typeOrAliasExpose "Relation"
+                 , CodeGen.funExpose "makeOneToN_"
+                 ]
+                    |> CodeGen.exposeExplicit
+                    |> Just
+                )
+            ]
+        , documentation =
+            CodeGen.emptyDocComment
+                |> CodeGen.markdown
+                    ([ "Accessor prism for the variant `"
+                     , variantName
+                     , "` of the `type "
+                     , typeName
+                     , "`."
+                     ]
+                        |> String.concat
+                    )
+                |> Just
+        , annotation =
+            CodeGen.funAnn
+                (CodeGen.typed "Relation"
+                    [ case variantValues of
+                        [] ->
+                            CodeGen.unitAnn
+
+                        top :: down ->
+                            Stack.topDown top down
+                                |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ soFar, value ])
+                    , CodeGen.typeVar "reachable"
+                    , CodeGen.typeVar "wrap"
+                    ]
+                )
+                (CodeGen.typed "Relation"
+                    [ CodeGen.typed typeName
+                        (typeParameters |> List.map CodeGen.typeVar)
+                    , CodeGen.typeVar "reachable"
+                    , CodeGen.maybeAnn (CodeGen.typeVar "wrap")
+                    ]
+                )
+                |> Just
+        , implementation =
+            let
+                { access, alter } =
+                    implementation
+                        { variantName = variantName
+                        , variantValues = variantValues
+                        }
+            in
+            CodeGen.construct "makeOneToN_"
+                [ CodeGen.string (variantModule ++ "." ++ variantName)
+                , access
+                , alter
+                ]
+        }
+
+
+{-| [`VariantPrismBuild`](#VariantPrismBuild)
+of named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/)
+which with
+
+    VariantPrism.GenerateUsed.accessors
+        |> VariantPrism.GenerateUsed.withName
+            VariantPrism.GenerateUsed.prismNameOnVariant
+        |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
+            "Extra.Local"
+        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
+
+and
+
+    module Data exposing (Data(..))
+
+    type Data a b c d
+        = Some a b c d
+        | None
+
+generates
+
+    module Data.Extra.Local exposing (onSome)
+
+    import Accessors exposing (makeOneToN_)
+    import Data exposing (Data(..))
+
+    {-| Accessor prism for the variant `Some` of the `type Data`.
+    -}
+    some :
+        Relation ( a, ( b, ( c, d ) ) ) reachable wrap
+        -> Relation (Data a b c d) reachable (Maybe wrap)
+    some =
+        makeOneToN
+            (\valuesAlter variantType ->
+                case variantType of
+                    Some value0 value1 value2 value3 ->
+                        ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
+
+                    _ ->
+                        Nothing
+            )
+            (\valuesAlter variantType ->
+                case variantType of
+                    Some value0 value1 value2 value3 ->
+                        let
+                            ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
+                                ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
+                        in
+                        Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
+
+                    someNot ->
+                        someNot
+            )
+
+-}
+accessorsBChiquet : VariantPrismBuild
+accessorsBChiquet =
+    \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
+        { imports =
+            [ CodeGen.importStmt [ "Accessors" ]
+                Nothing
+                ([ CodeGen.typeOrAliasExpose "Relation"
+                 , CodeGen.funExpose "makeOneToN"
+                 ]
                     |> CodeGen.exposeExplicit
                     |> Just
                 )
@@ -914,7 +1036,9 @@ ruleImplementation config =
             { fromProjectToModule =
                 projectContextToModule
                     { generationModuleSuffix = configuration.generationModuleSuffix }
-            , fromModuleToProject = moduleContextToProject
+            , fromModuleToProject =
+                moduleContextToProject
+                    { generationModuleSuffix = configuration.generationModuleSuffix }
             , foldProjectContexts = projectContextsFold
             }
         |> Rule.withFinalProjectEvaluation
@@ -1036,8 +1160,10 @@ projectContextToModule { generationModuleSuffix } =
         |> Rule.withModuleNameLookupTable
 
 
-moduleContextToProject : Rule.ContextCreator ModuleContext ProjectContext
-moduleContextToProject =
+moduleContextToProject :
+    { generationModuleSuffix : String }
+    -> Rule.ContextCreator ModuleContext ProjectContext
+moduleContextToProject { generationModuleSuffix } =
     Rule.initContextCreator
         (\meta moduleKey moduleContext ->
             let
@@ -1058,20 +1184,24 @@ moduleContextToProject =
                             }
                     }
 
-                PossibleUseModuleContext notGenerationModuleContext ->
+                PossibleUseModuleContext possibleUseModuleContext ->
                     { variantTypes = Dict.empty
                     , generationModules = Dict.empty
                     , useModules =
                         Dict.singleton moduleName
                             { key = moduleKey
-                            , belowImportsColumn = notGenerationModuleContext.belowImportsColumn
+                            , belowImportsColumn = possibleUseModuleContext.belowImportsColumn
                             , uses =
-                                notGenerationModuleContext.uses
+                                possibleUseModuleContext.uses
                                     |> Dict.map
                                         (\originModule_ variantsOfUsesOfVariantOriginModule ->
+                                            let
+                                                generationModuleName =
+                                                    originModule_ ++ "." ++ generationModuleSuffix
+                                            in
                                             { variantsOfUses = variantsOfUsesOfVariantOriginModule
                                             , import_ =
-                                                if Set.member originModule_ notGenerationModuleContext.importedModules then
+                                                if Set.member generationModuleName possibleUseModuleContext.importedModules then
                                                     Present
 
                                                 else
@@ -1103,8 +1233,8 @@ moduleHeaderVisit : Module -> ModuleContext -> ModuleContext
 moduleHeaderVisit moduleHeader =
     \context ->
         case context of
-            PossibleUseModuleContext notGenerationModuleContext ->
-                notGenerationModuleContext |> PossibleUseModuleContext
+            PossibleUseModuleContext possibleUseModuleContext ->
+                possibleUseModuleContext |> PossibleUseModuleContext
 
             GenerationModuleContext generationModuleContext ->
                 case moduleHeader of
@@ -1138,22 +1268,23 @@ importVisit importNode =
                     |> belowImportsColumnUpdate
                     |> GenerationModuleContext
 
-            PossibleUseModuleContext notGenerationModuleContext ->
-                notGenerationModuleContext
-                    |> belowImportsColumnUpdate
-                    |> (\r ->
-                            { r
-                                | importedModules =
-                                    r.importedModules
-                                        |> Set.insert
-                                            (importNode
-                                                |> Node.value
-                                                |> .moduleName
-                                                |> Node.value
-                                                |> qualifiedSyntaxToString
-                                            )
-                            }
-                       )
+            PossibleUseModuleContext possibleUseModuleContext ->
+                let
+                    belowImportsColumnUpdated =
+                        possibleUseModuleContext
+                            |> belowImportsColumnUpdate
+                in
+                { belowImportsColumnUpdated
+                    | importedModules =
+                        belowImportsColumnUpdated.importedModules
+                            |> Set.insert
+                                (importNode
+                                    |> Node.value
+                                    |> .moduleName
+                                    |> Node.value
+                                    |> qualifiedSyntaxToString
+                                )
+                }
                     |> PossibleUseModuleContext
 
 
@@ -1171,12 +1302,12 @@ expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGener
             GenerationModuleContext generationModuleContext ->
                 generationModuleContext |> GenerationModuleContext
 
-            PossibleUseModuleContext notGenerationModuleContext ->
+            PossibleUseModuleContext possibleUseModuleContext ->
                 (case expressionNode |> Node.value of
                     Expression.FunctionOrValue qualificationSyntax name ->
                         case name |> Parser.run nameParser of
                             Err _ ->
-                                notGenerationModuleContext
+                                possibleUseModuleContext
 
                             Ok { variantName } ->
                                 let
@@ -1185,7 +1316,7 @@ expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGener
 
                                     possibleGenerationModule =
                                         ModuleNameLookupTable.moduleNameAt
-                                            notGenerationModuleContext.moduleOriginLookup
+                                            possibleUseModuleContext.moduleOriginLookup
                                             functionOrValueRange
                                             |> Maybe.withDefault qualificationSyntax
                                             |> qualifiedSyntaxToString
@@ -1213,12 +1344,12 @@ expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGener
                                 in
                                 case maybeGenerationModuleOriginModule of
                                     Nothing ->
-                                        notGenerationModuleContext
+                                        possibleUseModuleContext
 
                                     Just originModule_ ->
-                                        { notGenerationModuleContext
+                                        { possibleUseModuleContext
                                             | uses =
-                                                notGenerationModuleContext.uses
+                                                possibleUseModuleContext.uses
                                                     |> Dict.update
                                                         originModule_
                                                         (\usesSoFar ->
@@ -1230,7 +1361,7 @@ expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGener
                                         }
 
                     _ ->
-                        notGenerationModuleContext
+                        possibleUseModuleContext
                 )
                     |> PossibleUseModuleContext
 
@@ -1257,15 +1388,15 @@ declarationVisit declaration =
                 )
                     |> GenerationModuleContext
 
-            PossibleUseModuleContext notGenerationModuleContext ->
+            PossibleUseModuleContext possibleUseModuleContext ->
                 (case declaration |> declarationToVariantType of
                     Nothing ->
-                        notGenerationModuleContext
+                        possibleUseModuleContext
 
                     Just ( variantTypeName, variantType ) ->
-                        { notGenerationModuleContext
+                        { possibleUseModuleContext
                             | variantTypes =
-                                notGenerationModuleContext.variantTypes
+                                possibleUseModuleContext.variantTypes
                                     |> Dict.insert variantTypeName variantType
                         }
                 )
@@ -1371,7 +1502,8 @@ generateForProject { context, config } =
 
 
 generateForModule :
-    { usedVariantOriginModule : { variantsOfUses : Dict String Range, import_ : Presence }
+    { usedVariantOriginModule :
+        { variantsOfUses : Dict String Range, import_ : Presence }
     , useModuleKey : Rule.ModuleKey
     , useModuleBelowImportsColumn : Int
     , variantOriginModuleName : String
@@ -1448,7 +1580,10 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                         useModuleKey
                         { message = [ "`", importString, "` missing" ] |> String.concat
                         , details =
-                            [ "Add the variant prism generation `module` `import` through the supplied fix." ]
+                            [ "Add the variant prism generation `module` `import` through the supplied fix."
+                            , -- TODO remove
+                              "!Test value!: variant origin name = `" ++ variantOriginModuleName ++ "`"
+                            ]
                         }
                         firstUseRange
                         [ [ "\n", importString ]
