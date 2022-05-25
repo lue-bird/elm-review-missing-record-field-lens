@@ -86,13 +86,13 @@ import Accessors exposing (over)
 import Accessors.Library exposing (onEach)
 
 ... path newInput =
-    over
-        (Field.projects -- assumes some {m | projects : {s | focus : Hand}}
-            << Scroll.focus
-            << Hand.onFilled -- where type Hand = Filled {m | calls : List (Tree something)} | OtherVariant
-            << Field.calls
-            << onEach
-            << Tree.elementAt path
+    over                           --                  <target>
+        (Field.projects            -- { _ | projects : <Scroll ...> }
+            << Scroll.focus        -- type Scroll item = BeforeFocusAfter _ <(Hand item)> _
+            << Hand.onFilled       -- type Hand fill = Filled <fill> | ...
+            << Field.calls         -- { _ | projects : <List ...> }
+            << onEach              -- List <(Tree ...)>
+            << Tree.elementAt path -- type Tree element = Tree element (List <element {- at path -}>)
         )
         (Tree.childPrepend newInput)
 ```
@@ -130,10 +130,11 @@ See [`Config`](NoMissingRecordFieldLens#Config)
 
 ### lenses that work out of the box
 
-- [bChiquet/elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
-- [sjorn3/elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
-- [arturopala/elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
-- [zh5/zipper](https://package.elm-lang.org/packages/z5h/zipper/latest/)
+  - [`erlandsona/elm-accessors`](https://package.elm-lang.org/packages/erlandsona/elm-accessors/latest/)
+  - [`sjorn3/elm-fields`](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
+  - [`arturopala/elm-monocle`](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
+  - [`zh5/zipper`](https://package.elm-lang.org/packages/z5h/zipper/latest/)
+  - [`bChiquet/elm-accessors`](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
 
 It's also possible to generate custom lenses or to customize the generation of existing ones.
 
