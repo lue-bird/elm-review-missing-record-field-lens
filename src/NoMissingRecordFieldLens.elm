@@ -1,7 +1,7 @@
 module NoMissingRecordFieldLens exposing
     ( rule, Config
-    , accessors, monocle, fields, zipper
-    , FieldHelperGenerator, FieldHelperDeclaration, functionsForField, getSetRecordForField, withDocumentation, withName
+    , accessors, monocle, fields, zipper, accessorsBChiquet
+    , FieldLensGenerator, FieldLensDeclaration, functionsForField, getSetRecordForField, withDocumentation, withName
     )
 
 {-|
@@ -14,17 +14,17 @@ module NoMissingRecordFieldLens exposing
 
 ## working out of the box
 
-@docs accessors, monocle, fields, zipper
+@docs accessors, monocle, fields, zipper, accessorsBChiquet
 
 
 ## custom
 
-@docs FieldHelperGenerator, FieldHelperDeclaration, functionsForField, getSetRecordForField, withDocumentation, withName
+@docs FieldLensGenerator, FieldLensDeclaration, functionsForField, getSetRecordForField, withDocumentation, withName
 
 -}
 
 import Elm.CodeGen as CodeGen
-import NoMissingRecordFieldHelper.Internal as Internal
+import NoMissingRecordFieldLens.Internal as Internal
 import Review.Rule exposing (Rule)
 
 
@@ -32,10 +32,11 @@ import Review.Rule exposing (Rule)
 
 Examples are
 
-  - [bChiquet's elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
-  - [sjorn3's elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
-  - [arturopala's elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
-  - [zh5's zipper](https://package.elm-lang.org/packages/z5h/zipper/latest/)
+  - [`erlandsona/elm-accessors`](https://package.elm-lang.org/packages/erlandsona/elm-accessors/latest/)
+  - [`sjorn3/elm-fields`](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/)
+  - [`arturopala/elm-monocle`](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest)
+  - [`zh5/zipper`](https://package.elm-lang.org/packages/z5h/zipper/latest/)
+  - [`bChiquet/elm-accessors`](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
 
 ```
 config =
@@ -51,7 +52,7 @@ config =
       - [`elm-fields`](#fields),
       - [`elm-monocle`](#monocle),
       - [`zipper`](#zipper) or
-      - [a custom one](#FieldHelperGenerator).
+      - [a custom one](#FieldLensGenerator).
 
   - `generateIn`: The module where all field lenses will be generated in
 
@@ -65,7 +66,7 @@ config =
     import Accessors.Library.Fields as Field
 
     scoreAPoint =
-        Accessors.over Field.score ((+) 1)
+        Accessors.over Field.score (\score -> score + 1)
 
 
 ### Fail
@@ -95,7 +96,7 @@ rule config =
       - [`elm-monocle`](#monocle),
       - [`zipper`](#zipper) or
       - [`updateField`](#update), [`setField`](#set)
-      - [a custom one](#FieldHelperGenerator).
+      - [a custom one](#FieldLensGenerator).
 
   - `generateIn`: The module where all field lenses will be generated in
 
@@ -103,12 +104,12 @@ rule config =
 
 -}
 type alias Config =
-    { generator : FieldHelperGenerator
+    { generator : FieldLensGenerator
     , generateIn : ( String, List String )
     }
 
 
-{-| How to generate a [`FieldHelperDeclaration`](#FieldHelperDeclaration) plus the necessary imports.
+{-| How to generate a [`FieldLensDeclaration`](#FieldLensDeclaration) plus the necessary imports.
 
 Out of the box there are lenses for
 
@@ -119,7 +120,7 @@ Out of the box there are lenses for
 
 You can also create a custom one with the help of [the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest):
 
-    customLens : FieldHelperGenerator
+    customLens : FieldLensGenerator
     customLens =
         { imports =
             [ importStmt [ "CustomLens" ]
@@ -154,11 +155,11 @@ You can also create a custom one with the help of [the-sett's elm-syntax-dsl](ht
         }
 
 -}
-type alias FieldHelperGenerator =
+type alias FieldLensGenerator =
     { imports : List CodeGen.Import
     , declaration :
         { fieldName : String }
-        -> FieldHelperDeclaration
+        -> FieldLensDeclaration
     }
 
 
@@ -170,7 +171,7 @@ type alias FieldHelperGenerator =
     [name] =
         [implementation]
 
-You can customize existing `FieldHelperDeclaration`s with [`withDocumentation`](#withDocumentation) and [`withName`](#withName)
+You can customize existing `FieldLensDeclaration`s with [`withDocumentation`](#withDocumentation) and [`withName`](#withName)
 or create custom lens ([`functionsForField`](#functionsForField) and [`getSetRecordForField`](#getSetRecordForField) can be helpful).
 
     customLensDeclaration { fieldName } =
@@ -196,7 +197,7 @@ or create custom lens ([`functionsForField`](#functionsForField) and [`getSetRec
         }
 
 -}
-type alias FieldHelperDeclaration =
+type alias FieldLensDeclaration =
     { documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
     , name : String
     , annotation : Maybe CodeGen.TypeAnnotation
@@ -204,16 +205,18 @@ type alias FieldHelperDeclaration =
     }
 
 
-{-| Generate lenses for [bChiquet's elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest) in the form
+{-| [`FieldLensGenerator`](#FieldLensGenerator)
+for named [`erlandsona/elm-accessors`](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/)
+in the form
 
-    import Accessors exposing (Relation, makeOneToOne)
+    import Accessors exposing (Lens, makeOneToOne_)
 
-    score : Relation score sub wrap -> Relation { record | score : score } sub wrap
+    score : Lens { record | score : score } transformed score wrap
     score =
-        makeOneToOne .score (\f r -> { r | score = f r.score })
+        makeOneToOne_ ".score" .score (\alter record -> { record | score = record.score |> alter })
 
 -}
-accessors : FieldHelperGenerator
+accessors : FieldLensGenerator
 accessors =
     { imports =
         [ CodeGen.importStmt [ "Accessors" ]
@@ -252,16 +255,71 @@ accessors =
     }
 
 
-{-| Generate lenses for [arturopala's elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest) in the form
+{-| [`FieldLensGenerator`](#FieldLensGenerator) for [`bChiquet/elm-accessors`](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest) in the form
+
+    import Accessors exposing (Relation, makeOneToOne)
+
+    score : Relation score transformed wrap -> Relation { record | score : score } transformed wrap
+    score =
+        makeOneToOne .score (\alter record -> { record | score = record.score |> alter })
+
+[`accessors`](#accessors) generates for [`erlandsona/elm-accessors`](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/) which adds names.
+
+-}
+accessorsBChiquet : FieldLensGenerator
+accessorsBChiquet =
+    { imports =
+        [ CodeGen.importStmt [ "Accessors" ]
+            Nothing
+            (CodeGen.exposeExplicit
+                [ CodeGen.funExpose "makeOneToOne"
+                , CodeGen.typeOrAliasExpose "Relation"
+                ]
+                |> Just
+            )
+        ]
+    , declaration =
+        \{ fieldName } ->
+            { documentation = Nothing
+            , name = fieldName
+            , annotation =
+                let
+                    relation super =
+                        CodeGen.typed
+                            "Relation"
+                            [ super
+                            , CodeGen.typeVar "transformed"
+                            , CodeGen.typeVar "wrap"
+                            ]
+                in
+                CodeGen.funAnn
+                    (relation (CodeGen.typeVar fieldName))
+                    (relation
+                        (CodeGen.extRecordAnn "record"
+                            [ ( fieldName, CodeGen.typeVar fieldName ) ]
+                        )
+                    )
+                    |> Just
+            , implementation =
+                let
+                    { access, update } =
+                        functionsForField fieldName
+                in
+                CodeGen.construct "makeOneToOne" [ access, update ]
+            }
+    }
+
+
+{-| [`FieldLensGenerator`](#FieldLensGenerator) for [arturopala's elm-monocle](https://package.elm-lang.org/packages/arturopala/elm-monocle/latest) in the form
 
     import Monocle.Lens exposing (Lens)
 
     score : Lens { record | score : score } score
     score =
-        { get = .score, set = \score_ r -> { r | score = score_ } }
+        { get = .score, set = \replacement record -> { record | score = replacement } }
 
 -}
-monocle : FieldHelperGenerator
+monocle : FieldLensGenerator
 monocle =
     { imports =
         [ CodeGen.importStmt [ "Monocle", "Lens" ]
@@ -287,16 +345,16 @@ monocle =
     }
 
 
-{-| Generate lenses for [z5h's zipper](https://package.elm-lang.org/packages/z5h/zipper/latest/) in the form
+{-| [`FieldLensGenerator`](#FieldLensGenerator) for [z5h's zipper](https://package.elm-lang.org/packages/z5h/zipper/latest/) in the form
 
     import Zipper exposing (Zipper, into)
 
     intoScore : Zipper { record | score : score } root -> Zipper score root
     intoScore =
-        into .score (\score_ r -> { r | score = score_ })
+        into .score (\replacement record -> { record | score = replacement })
 
 -}
-zipper : FieldHelperGenerator
+zipper : FieldLensGenerator
 zipper =
     { imports =
         [ CodeGen.importStmt [ "Zipper" ]
@@ -342,17 +400,17 @@ zipper =
     }
 
 
-{-| Generate lenses for [sjorn3's elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/) in the form
+{-| [`FieldLensGenerator`](#FieldLensGenerator) for [sjorn3's elm-fields](https://package.elm-lang.org/packages/sjorn3/elm-fields/latest/) in the form
 
     score :
-        { get : { a | score : score } -> score
-        , set : score -> { b | score : score } -> { b | score : score }
+        { get : { record0 | score : score } -> score
+        , set : score -> { record1 | score : score } -> { record1 | score : score }
         }
     score =
-        { get = .score, set = \score_ r -> { r | score = score_ } }
+        { get = .score, set = \replacement record -> { record | score = replacement } }
 
 -}
-fields : FieldHelperGenerator
+fields : FieldLensGenerator
 fields =
     { imports = []
     , declaration =
@@ -370,12 +428,12 @@ fields =
                 in
                 CodeGen.recordAnn
                     [ ( "get"
-                      , CodeGen.funAnn (recordType "a") fieldType
+                      , CodeGen.funAnn (recordType "record0") fieldType
                       )
                     , ( "set"
                       , CodeGen.funAnn
                             fieldType
-                            (CodeGen.funAnn (recordType "b") (recordType "b"))
+                            (CodeGen.funAnn (recordType "record1") (recordType "record1"))
                       )
                     ]
                     |> Just
@@ -386,7 +444,7 @@ fields =
 
 {-| Generate a field lens implementation in the form
 
-    { get = .score, set = \score_ r -> { r | score = score_ } }
+    { get = .score, set = \replacement record -> { record | score = replacement } }
 
 This is equivalent to
 
@@ -407,24 +465,38 @@ getSetRecordForField fieldName =
         [ ( "get", access ), ( "set", set ) ]
 
 
-{-| The access, set and update functions for a record field.
+{-| access, set and update functions for a given record field.
 
     functionsForField "score"
-    --> { access = accessFun ".score"
-    --> , set =
-    -->     lambda
-    -->         [ varPattern "score_", varPattern "r" ]
-    -->         (update "r" [ ( "score", val "score_" ) ])
-    --> , update =
-    -->     lambda
-    -->         [ varPattern "f", varPattern "r" ]
-    -->         (update "r"
-    -->             [ ( "score"
-    -->               , construct "f" [ access (val "r") "score" ]
-    -->               )
-    -->             ]
-    -->         )
-    --> }
+
+    -->
+    { access = accessFun ("." ++ fieldName)
+    , set =
+        lambda
+            [ varPattern "replacement"
+            , varPattern "record"
+            ]
+            (update "record"
+                [ ( fieldName
+                  , val "replacement"
+                  )
+                ]
+            )
+    , update =
+        lambda
+            [ varPattern "alter"
+            , varPattern "record"
+            ]
+            (update "record"
+                [ ( fieldName
+                  , applyBinOp
+                        (access (val "record") fieldName)
+                        piper
+                        (fun "alter")
+                  )
+                ]
+            )
+    }
 
 -}
 functionsForField :
@@ -438,31 +510,33 @@ functionsForField fieldName =
     { access = CodeGen.accessFun ("." ++ fieldName)
     , set =
         CodeGen.lambda
-            [ CodeGen.varPattern (fieldName ++ "_")
-            , CodeGen.varPattern "r"
+            [ CodeGen.varPattern "replacement"
+            , CodeGen.varPattern "record"
             ]
-            (CodeGen.update "r"
+            (CodeGen.update "record"
                 [ ( fieldName
-                  , CodeGen.val (fieldName ++ "_")
+                  , CodeGen.val "replacement"
                   )
                 ]
             )
     , update =
         CodeGen.lambda
-            [ CodeGen.varPattern "f"
-            , CodeGen.varPattern "r"
+            [ CodeGen.varPattern "alter"
+            , CodeGen.varPattern "record"
             ]
-            (CodeGen.update "r"
+            (CodeGen.update "record"
                 [ ( fieldName
-                  , CodeGen.construct "f"
-                        [ CodeGen.access (CodeGen.val "r") fieldName ]
+                  , CodeGen.applyBinOp
+                        (CodeGen.access (CodeGen.val "record") fieldName)
+                        CodeGen.piper
+                        (CodeGen.fun "alter")
                   )
                 ]
             )
     }
 
 
-{-| The provided [`FieldHelperGenerator`](#FieldHelperGenerator)s in this package have no documentation comment.
+{-| The provided [`FieldLensGenerator`](#FieldLensGenerator)s in this package have no documentation comment.
 
 You can generate your own documentation, though:
 
@@ -477,10 +551,10 @@ You can generate your own documentation, though:
 -}
 withDocumentation :
     CodeGen.Comment CodeGen.DocComment
-    -> FieldHelperDeclaration
-    -> FieldHelperDeclaration
-withDocumentation docComment generatedFieldHelper =
-    { generatedFieldHelper
+    -> FieldLensDeclaration
+    -> FieldLensDeclaration
+withDocumentation docComment generatedFieldLens =
+    { generatedFieldLens
         | documentation = docComment |> Just
     }
 
@@ -494,8 +568,8 @@ withDocumentation docComment generatedFieldHelper =
 -}
 withName :
     String
-    -> FieldHelperDeclaration
-    -> FieldHelperDeclaration
+    -> FieldLensDeclaration
+    -> FieldLensDeclaration
 withName name fieldHelperDeclaration =
     { fieldHelperDeclaration | name = name }
 

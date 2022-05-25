@@ -1,4 +1,4 @@
-module NoMissingRecordFieldHelper.Internal exposing (nonExistentFieldHelperNameInfo, printFieldHelperDeclaration, rule)
+module NoMissingRecordFieldLens.Internal exposing (nonExistentFieldLensNameInfo, printFieldLensDeclaration, rule)
 
 import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
@@ -124,10 +124,10 @@ rule config =
                                     |> Dict.diff moduleWithUsages.usages
                                     |> Dict.keys
                                     |> List.map
-                                        (\nonExistentFieldHelperName ->
+                                        (\nonExistentFieldLensName ->
                                             Rule.errorForModuleWithFix
                                                 generationModule_.key
-                                                (nonExistentFieldHelperNameInfo nonExistentFieldHelperName)
+                                                (nonExistentFieldLensNameInfo nonExistentFieldLensName)
                                                 generationModule_.moduleNameRange
                                                 (let
                                                     insertLocationInDeclarations =
@@ -135,7 +135,7 @@ rule config =
                                                             |> Dict.toList
                                                             |> List.dropWhileRight
                                                                 (\( existing, _ ) ->
-                                                                    existing > nonExistentFieldHelperName
+                                                                    existing > nonExistentFieldLensName
                                                                 )
                                                             |> List.head
                                                  in
@@ -148,8 +148,8 @@ rule config =
                                                                 generationModule_.beforeDeclarations
                                                         )
                                                         ([ "\n\n\n"
-                                                         , generator.declaration { fieldName = nonExistentFieldHelperName }
-                                                            |> printFieldHelperDeclaration
+                                                         , generator.declaration { fieldName = nonExistentFieldLensName }
+                                                            |> printFieldLensDeclaration
                                                          ]
                                                             |> String.concat
                                                         )
@@ -167,7 +167,7 @@ rule config =
                                                     Node { end } (Exposing.Explicit _) ->
                                                         [ Fix.insertAt
                                                             { row = end.row, column = end.column - 1 }
-                                                            (", " ++ nonExistentFieldHelperName)
+                                                            (", " ++ nonExistentFieldLensName)
                                                         ]
 
                                                     _ ->
@@ -361,10 +361,10 @@ type ModuleContext
 --
 
 
-nonExistentFieldHelperNameInfo : String -> { message : String, details : List String }
-nonExistentFieldHelperNameInfo nonExistentFieldHelperName =
+nonExistentFieldLensNameInfo : String -> { message : String, details : List String }
+nonExistentFieldLensNameInfo nonExistentFieldLensName =
     { message =
-        "lens for the field `." ++ nonExistentFieldHelperName ++ "` doesn't exists yet"
+        "lens for the field `." ++ nonExistentFieldLensName ++ "` doesn't exists yet"
     , details = [ "Add the auto-generated lens through the fix." ]
     }
 
@@ -388,24 +388,24 @@ generationModuleDoesntExistInfo generationModule =
 
 
 type alias Config =
-    { generator : FieldHelperGenerator
+    { generator : FieldLensGenerator
     , generateIn : ( String, List String )
     }
 
 
-{-| How to generate a [`FieldHelperDeclaration`](NoMissingRecordFieldLens#FieldHelperDeclaration) plus the necessary imports.
+{-| How to generate a [`FieldLensDeclaration`](NoMissingRecordFieldLens#FieldLensDeclaration) plus the necessary imports.
 -}
-type alias FieldHelperGenerator =
+type alias FieldLensGenerator =
     { imports : List CodeGen.Import
     , declaration :
         { fieldName : String }
-        -> FieldHelperDeclaration
+        -> FieldLensDeclaration
     }
 
 
 {-| All the components to build a field lens declaration.
 -}
-type alias FieldHelperDeclaration =
+type alias FieldLensDeclaration =
     { documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
     , name : String
     , annotation : Maybe CodeGen.TypeAnnotation
@@ -415,11 +415,11 @@ type alias FieldHelperDeclaration =
 
 {-| Print a lens declaration.
 
-    test "custom FieldHelperGenerator"
+    test "custom FieldLensGenerator"
         (\() ->
-            customFieldHelperGenerator.declaration
+            customFieldLensGenerator.declaration
                 { fieldName = "test" }
-                |> printFieldHelperDeclaration
+                |> printFieldLensDeclaration
                 |> Expect.equal
                     """{-| A lens for the field `.test`.
     -}
@@ -432,8 +432,8 @@ type alias FieldHelperDeclaration =
         )
 
 -}
-printFieldHelperDeclaration : FieldHelperDeclaration -> String
-printFieldHelperDeclaration =
+printFieldLensDeclaration : FieldLensDeclaration -> String
+printFieldLensDeclaration =
     \{ documentation, annotation, implementation, name } ->
         CodeGen.funDecl
             documentation
