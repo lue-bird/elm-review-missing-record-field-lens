@@ -9,7 +9,7 @@ is finished, every functionality will be ported over.
 
 ## `NoMissingRecordFieldLens`
 
-You find myself writing code like this?
+You find yourself writing code like ↓ ?
 
 ```elm
 ... path newInput =
@@ -32,11 +32,9 @@ You find myself writing code like this?
                         )
         }
 ```
-Let's define some `Field.nameAlter` helpers:
-```elm
-module Field exposing (callsAlter, projectsAlter)
-```
-then
+
+`Field.nameAlter` helpers will help remove some verbosity:
+
 ```elm
 import Field
 
@@ -53,20 +51,29 @@ import Field
                 )
             )
         )
-
-
 ```
+with
+```elm
+module Field exposing (callsAlter, projectsAlter)
+
+callsAlter : (calls -> calls) -> { record | calls : calls } -> { record | calls : calls }
+callsAlter alter =
+    \record -> { record | calls = record.calls |> alter }
+...
+```
+
 We can reduce the number of helpers by _combining the possible operations (access, replace, alter, name, ...)_ into a "lens":
 
 ```elm
 import Field
+import Hand.Extra.Local as Hand
 import Accessors exposing (over)
 import Accessors.Library exposing (onEach)
 
 ... path newInput =
     over Field.projects --← a "lens" for the field .projects
         (over Scroll.focus
-            (over Hand.onFilled
+            (over Hand.onFilled --← a "lens" for the variant `Hand.Filled`
                 (over Fields.calls --← a "lens" for the field .calls
                     (over onEach
                         (over (Tree.elementAt path)
@@ -81,18 +88,18 @@ Seeing a pattern? You can, to put the cherry on the cake, _compose_ those "lense
 
 ```elm
 import Field
-import Hand.Extra as Hand
+import Hand.Extra.Local as Hand
 import Accessors exposing (over)
 import Accessors.Library exposing (onEach)
 
 ... path newInput =
     over                           --                  <target>
         (Field.projects            -- { _ | projects : <Scroll ...> }
-            << Scroll.focus        -- type Scroll item = BeforeFocusAfter _ <(Hand item)> _
+            << Scroll.focus
             << Hand.onFilled       -- type Hand fill = Filled <fill> | ...
             << Field.calls         -- { _ | projects : <List ...> }
-            << onEach              -- List <(Tree ...)>
-            << Tree.elementAt path -- type Tree element = Tree element (List <element {- at path -}>)
+            << onEach              -- List (<Tree ...>)
+            << Tree.elementAt path
         )
         (Tree.childPrepend newInput)
 ```
@@ -100,9 +107,10 @@ import Accessors.Library exposing (onEach)
 Methods like this make your code more **readable**. Compare with the first example.
 
 → [`NoMissingRecordFieldLens`](NoMissingRecordFieldLens) automatically generates _record field_ lenses you use.
-No more manual labour.
 
-In the last examples, `Field.projects` & `Field.calls` will be generated in `Field.elm`.
+In the last examples
+- `projects`, `calls` lenses will be generated in `module Field`
+- `onFilled` prism will be generated in `module Hand.Extra.Local` by [`VariantPrism.GenerateUsed`](#VariantPrism.GenerateUsed) 
 
 ### try without installing
 
@@ -179,8 +187,11 @@ Don't [obsessively employ primitives](https://elm-radio.com/episode/primitive-ob
 The motivations for using this are similar to [`NoMissingRecordFieldLens`](#NoMissingRecordFieldLens),
 this time trying to cut down on situations where you're only interested in values of one variant.
 
-For any variant `type`, you can call `YourVariantType.On.oneOfThree`.
-If this prism hasn't already been created, it will automatically be generated.
+With the [`Config`](VariantPrism-GenerateUsed#Config) below,
+calling `YourVariantType.onOneOfThree`,
+the rule will automatically
+- `import YourVariantType.Extra.Local as YourVariantType`
+- generate non-existent prisms in `YourVariantType.Extra.Local`
 
 ### try without installing
 
@@ -198,8 +209,8 @@ import VariantPrism.GenerateUsed
 
 config : List Rule
 config =
-    [ { name = VariantPrism.GenerateUsed.prismNameOnVariant
-      , build = VariantPrism.GenerateUsed.accessors
+    [ { build = VariantPrism.GenerateUsed.accessors
+      , name = VariantPrism.GenerateUsed.prismNameOnVariant
       }
         |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
             "Extra.Local"
@@ -212,10 +223,10 @@ config =
 ### prisms that work out of the box
 
 - [erlandsona/elm-accessors](https://package.elm-lang.org/packages/erlandsona/elm-accessors/latest)
+- [bChiquet/elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
 
-It's also possible to generate custom lenses or to customize the generation of existing ones.
-
+It's also possible to generate custom prisms or to customize the generation of existing ones.
 
 
 ## suggestions?
-→ [contributing](https://github.com/lue-bird/elm-review-missing-record-field-lens/blob/master/contributing.md).
+→ [contributing](https://github.com/lue-bird/elm-review-missing-record-field-lens/blob/master/contributing.md)
