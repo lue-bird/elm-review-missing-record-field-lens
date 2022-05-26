@@ -156,7 +156,21 @@ Structuring a model like
 , scene : { trees : ..., rocks : ... }
 }
 ```
-is a smelly pattern. It makes it unnecessarily hard to update inner fields.
+makes it unnecessarily hard to update inner fields.
+
+organizing in blocks
+```elm
+type alias Model = 
+    { column : Column
+    , textPage : TextPage
+    }
+```
+
+often doesn't make sense in practice
+where small pieces interact with one another:
+[from "Make Data Structures" by Richard Feldman – blocks → multiple sources of truth](https://youtu.be/x1FU3e0sT1I?t=1039)
+
+
 ```elm
 { playerPosition : ...
 , playerSpeed : ...
@@ -164,7 +178,8 @@ is a smelly pattern. It makes it unnecessarily hard to update inner fields.
 , sceneRocks : ...
 }
 ```
-Doesn't this make ui harder? Yes, but the extra explicitness is worth it.
+Doesn't ↑ make ui harder?
+Yes, but the extra explicitness is worth it.
 `player` could have things that are irrelevant to the ui like `configuredControls` etc.
 It's best to keep state structure and ui requirements separate.
 
