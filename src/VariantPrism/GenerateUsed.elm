@@ -236,12 +236,16 @@ implementation { variantName, variantValues } =
                         )
                   , case variantValues of
                         [] ->
-                            CodeGen.binOpChain
-                                CodeGen.unit
-                                CodeGen.piper
-                                [ CodeGen.fun "variantValuesAlter"
-                                , CodeGen.fun variantName
+                            CodeGen.letExpr
+                                [ CodeGen.letDestructuring
+                                    CodeGen.unitPattern
+                                    (CodeGen.applyBinOp
+                                        CodeGen.unit
+                                        CodeGen.piper
+                                        (CodeGen.fun "variantValuesAlter")
+                                    )
                                 ]
+                                (CodeGen.val variantName)
 
                         [ _ ] ->
                             CodeGen.binOpChain
