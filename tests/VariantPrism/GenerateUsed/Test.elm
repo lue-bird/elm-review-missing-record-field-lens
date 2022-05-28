@@ -341,7 +341,7 @@ type Data
                                 , details =
                                     [ "Add the variant prism generation `module` `import` through the supplied fix."
                                     ]
-                                , under = "Data.On.some"
+                                , under = "Data.On.none"
                                 }
                                 |> Review.Test.whenFixed
                                     """module Use exposing (use)
