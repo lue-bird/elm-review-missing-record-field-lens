@@ -386,7 +386,7 @@ none =
         (\\variantValuesAlter variantType ->
             case variantType of
                 None ->
-                    let 
+                    let
                         () =
                             () |> variantValuesAlter
                     in
