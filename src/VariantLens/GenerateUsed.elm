@@ -36,7 +36,8 @@ import Elm.Syntax.Import exposing (Import)
 import Elm.Syntax.Module as Module exposing (Module)
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Range)
-import Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, declarationToVariantType, importsToString, indexed, metaToVariantType, onColumn, qualifiedSyntaxToString)
+import Hand exposing (Empty, Hand(..))
+import Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, declarationToVariantType, importsToString, indexed, metaToVariantType, onColumn, qualifiedSyntaxToString, typeLens, typeRelation)
 import Parser exposing ((|.), (|=), Parser)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
 import Review.Fix as Fix
@@ -131,8 +132,8 @@ rule config =
 
 type alias Config =
     RecordWithoutConstructorFunction
-        { name : VariantLensNameConfig
-        , build : VariantLensBuild
+        { build : VariantLensBuild
+        , name : VariantLensNameConfig
         , generationModuleSuffix : String
         }
 
@@ -177,49 +178,80 @@ generates
 implementation :
     { variantName : String
     , variantValues : List CodeGen.TypeAnnotation
+    , otherVariants : Dict String { valueCount : Int }
     }
     ->
         { access : CodeGen.Expression
         , alter : CodeGen.Expression
         }
-implementation { variantName, variantValues } =
+implementation { variantName, variantValues, otherVariants } =
     { access =
-        CodeGen.lambda
-            [ CodeGen.varPattern "variantValuesAlter"
-            , CodeGen.varPattern "variantType"
-            ]
-            (CodeGen.caseExpr (CodeGen.val "variantType")
-                [ ( CodeGen.namedPattern variantName
-                        (variantValues
-                            |> List.indexedMap
-                                (\index _ ->
-                                    CodeGen.varPattern ("value" |> indexed index)
-                                )
-                        )
-                  , CodeGen.binOpChain
-                        (case variantValues of
-                            [] ->
-                                CodeGen.unit
-
-                            top :: down ->
-                                Stack.topDown top down
-                                    |> Stack.map
-                                        (\{ index } _ ->
-                                            CodeGen.val ("value" |> indexed index)
-                                        )
-                                    |> Stack.reverse
-                                    |> Stack.fold (\value soFar -> CodeGen.tuple [ value, soFar ])
-                        )
-                        CodeGen.piper
-                        [ CodeGen.fun "variantValuesAlter"
-                        , CodeGen.fun "Just"
-                        ]
-                  )
-                , ( CodeGen.allPattern
-                  , CodeGen.val "Nothing"
-                  )
+        if otherVariants |> Dict.isEmpty then
+            CodeGen.lambda
+                [ CodeGen.varPattern "variantValuesAlter"
+                , CodeGen.namedPattern variantName
+                    (variantValues
+                        |> List.indexedMap
+                            (\index _ ->
+                                CodeGen.varPattern ("value" |> indexed index)
+                            )
+                    )
                 ]
-            )
+                (CodeGen.applyBinOp
+                    (case variantValues of
+                        [] ->
+                            CodeGen.unit
+
+                        top :: down ->
+                            Stack.topDown top down
+                                |> Stack.map
+                                    (\{ index } _ ->
+                                        CodeGen.val ("value" |> indexed index)
+                                    )
+                                |> Stack.reverse
+                                |> Stack.fold (\value soFar -> CodeGen.tuple [ value, soFar ])
+                    )
+                    CodeGen.piper
+                    (CodeGen.fun "variantValuesAlter")
+                )
+
+        else
+            CodeGen.lambda
+                [ CodeGen.varPattern "variantValuesAlter"
+                , CodeGen.varPattern "variantType"
+                ]
+                (CodeGen.caseExpr (CodeGen.val "variantType")
+                    [ ( CodeGen.namedPattern variantName
+                            (variantValues
+                                |> List.indexedMap
+                                    (\index _ ->
+                                        CodeGen.varPattern ("value" |> indexed index)
+                                    )
+                            )
+                      , CodeGen.binOpChain
+                            (case variantValues of
+                                [] ->
+                                    CodeGen.unit
+
+                                top :: down ->
+                                    Stack.topDown top down
+                                        |> Stack.map
+                                            (\{ index } _ ->
+                                                CodeGen.val ("value" |> indexed index)
+                                            )
+                                        |> Stack.reverse
+                                        |> Stack.fold (\value soFar -> CodeGen.tuple [ value, soFar ])
+                            )
+                            CodeGen.piper
+                            [ CodeGen.fun "variantValuesAlter"
+                            , CodeGen.fun "Just"
+                            ]
+                      )
+                    , ( CodeGen.allPattern
+                      , CodeGen.val "Nothing"
+                      )
+                    ]
+                )
     , alter =
         CodeGen.lambda
             [ CodeGen.varPattern "variantValuesAlter"
@@ -362,11 +394,12 @@ generates
 -}
 accessors : VariantLensBuild
 accessors =
-    \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
+    \{ variantName, typeName, variantValues, typeParameters, variantModule, otherVariants } ->
         { imports =
             [ CodeGen.importStmt [ "Accessors" ]
                 Nothing
-                ([ CodeGen.typeOrAliasExpose "Lens"
+                ([ CodeGen.typeOrAliasExpose "Relation"
+                 , CodeGen.typeOrAliasExpose "Lens"
                  , CodeGen.funExpose "makeOneToN_"
                  ]
                     |> CodeGen.exposeExplicit
@@ -388,21 +421,41 @@ accessors =
                     )
                 |> Just
         , annotation =
-            lensType
-                (CodeGen.typed typeName
-                    (typeParameters |> List.map CodeGen.typeVar)
-                )
-                (CodeGen.typeVar "transformed")
-                (case variantValues of
-                    [] ->
-                        CodeGen.unitAnn
+            let
+                typeUnion =
+                    CodeGen.typed typeName
+                        (typeParameters |> List.map CodeGen.typeVar)
 
-                    top :: down ->
-                        Stack.topDown top down
-                            |> Stack.reverse
-                            |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ value, soFar ])
-                )
-                (CodeGen.typeVar "wrap")
+                typeVariantValues =
+                    case variantValues |> Stack.fromList of
+                        Empty _ ->
+                            CodeGen.unitAnn
+
+                        Filled stackFill ->
+                            Filled stackFill
+                                |> Stack.reverse
+                                |> Stack.fold (\value soFar -> CodeGen.tupleAnn [ value, soFar ])
+            in
+            (if otherVariants |> Dict.isEmpty then
+                typeLens
+                    typeUnion
+                    (CodeGen.typeVar "transformed")
+                    typeVariantValues
+                    (CodeGen.typeVar "wrap")
+
+             else
+                CodeGen.funAnn
+                    (typeRelation
+                        typeVariantValues
+                        (CodeGen.typeVar "reachable")
+                        (CodeGen.typeVar "wrap")
+                    )
+                    (typeRelation
+                        typeUnion
+                        (CodeGen.typeVar "reachable")
+                        (CodeGen.maybeAnn (CodeGen.typeVar "wrap"))
+                    )
+            )
                 |> Just
         , implementation =
             let
@@ -410,6 +463,7 @@ accessors =
                     implementation
                         { variantName = variantName
                         , variantValues = variantValues
+                        , otherVariants = otherVariants
                         }
             in
             CodeGen.construct "makeOneToN_"
@@ -418,18 +472,6 @@ accessors =
                 , alter
                 ]
         }
-
-
-{-| <https://package.elm-lang.org/packages/erlandsona/elm-accessors/2.1.0/Accessors#Lens>
--}
-lensType :
-    CodeGen.TypeAnnotation
-    -> CodeGen.TypeAnnotation
-    -> CodeGen.TypeAnnotation
-    -> CodeGen.TypeAnnotation
-    -> CodeGen.TypeAnnotation
-lensType structure transformed attribute built =
-    CodeGen.typed "Lens" [ structure, transformed, attribute, built ]
 
 
 {-| [`VariantLensBuild`](#VariantLensBuild)
@@ -487,7 +529,7 @@ generates
 -}
 accessorsBChiquet : VariantLensBuild
 accessorsBChiquet =
-    \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
+    \{ variantName, typeName, variantValues, typeParameters, variantModule, otherVariants } ->
         { imports =
             [ CodeGen.importStmt [ "Accessors" ]
                 Nothing
@@ -532,7 +574,12 @@ accessorsBChiquet =
                         (typeParameters |> List.map CodeGen.typeVar)
                     )
                     (CodeGen.typeVar "reachable")
-                    (CodeGen.maybeAnn (CodeGen.typeVar "wrap"))
+                    (if otherVariants |> Dict.isEmpty then
+                        CodeGen.typeVar "wrap"
+
+                     else
+                        CodeGen.maybeAnn (CodeGen.typeVar "wrap")
+                    )
                 )
                 |> Just
         , implementation =
@@ -541,19 +588,11 @@ accessorsBChiquet =
                     implementation
                         { variantName = variantName
                         , variantValues = variantValues
+                        , otherVariants = otherVariants
                         }
             in
             CodeGen.construct "makeOneToN" [ access, alter ]
         }
-
-
-typeRelation :
-    CodeGen.TypeAnnotation
-    -> CodeGen.TypeAnnotation
-    -> CodeGen.TypeAnnotation
-    -> CodeGen.TypeAnnotation
-typeRelation structure attribute wrap =
-    CodeGen.typed "Relation" [ structure, attribute, wrap ]
 
 
 {-| How to derive lens name <=> variant name.
@@ -748,6 +787,7 @@ type alias VariantLensBuild =
     , typeParameters : List String
     , variantName : String
     , variantValues : List CodeGen.TypeAnnotation
+    , otherVariants : Dict String { valueCount : Int }
     }
     ->
         { imports : List CodeGen.Import
@@ -1405,7 +1445,8 @@ generateForProject { context, config } =
                                 Just variantTypesInModule ->
                                     generateForModule
                                         { maybeGenerationModule =
-                                            context.generationModules |> Dict.get usedVariantOriginModuleName
+                                            context.generationModules
+                                                |> Dict.get usedVariantOriginModuleName
                                         , usedVariantOriginModule = usedVariantOriginModule
                                         , variantModuleName = usedVariantOriginModuleName
                                         , config = config
@@ -1495,6 +1536,11 @@ generateForModule { usedVariantOriginModule, variantModuleName, maybeGenerationM
                 |> Dict.toList
                 |> List.concatMap
                     (\( variantTypeName, variantType ) ->
+                        let
+                            variantValueCounts =
+                                variantType.variants
+                                    |> Dict.map (\_ values -> { valueCount = values |> List.length })
+                        in
                         variantType.variants
                             |> Dict.filter
                                 (\variantName _ ->
@@ -1515,6 +1561,7 @@ generateForModule { usedVariantOriginModule, variantModuleName, maybeGenerationM
                                                 , typeParameters = variantType.parameters
                                                 , variantName = variantName
                                                 , variantValues = variantValues
+                                                , otherVariants = variantValueCounts |> Dict.remove variantName
                                                 }
 
                                         builtName =

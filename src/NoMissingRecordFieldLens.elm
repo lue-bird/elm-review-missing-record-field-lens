@@ -24,6 +24,7 @@ module NoMissingRecordFieldLens exposing
 -}
 
 import Elm.CodeGen as CodeGen
+import Help exposing (typeLens, typeRelation)
 import NoMissingRecordFieldLens.Internal as Internal
 import Review.Rule exposing (Rule)
 
@@ -234,13 +235,13 @@ accessors =
             { documentation = Nothing
             , name = fieldName
             , annotation =
-                CodeGen.typed "Lens"
-                    [ CodeGen.extRecordAnn "record"
+                typeLens
+                    (CodeGen.extRecordAnn "record"
                         [ ( fieldName, CodeGen.typeVar fieldName ) ]
-                    , CodeGen.typeVar "transformed"
-                    , CodeGen.typeVar fieldName
-                    , CodeGen.typeVar "wrap"
-                    ]
+                    )
+                    (CodeGen.typeVar "transformed")
+                    (CodeGen.typeVar fieldName)
+                    (CodeGen.typeVar "wrap")
                     |> Just
             , implementation =
                 let
@@ -286,12 +287,10 @@ accessorsBChiquet =
             , annotation =
                 let
                     relation super =
-                        CodeGen.typed
-                            "Relation"
-                            [ super
-                            , CodeGen.typeVar "transformed"
-                            , CodeGen.typeVar "wrap"
-                            ]
+                        typeRelation
+                            super
+                            (CodeGen.typeVar "transformed")
+                            (CodeGen.typeVar "wrap")
                 in
                 CodeGen.funAnn
                     (relation (CodeGen.typeVar fieldName))

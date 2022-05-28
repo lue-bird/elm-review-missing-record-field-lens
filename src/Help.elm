@@ -1,4 +1,4 @@
-module Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, declarationToVariantType, importsToString, indexed, metaToVariantType, onColumn, qualifiedSyntaxToString)
+module Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, declarationToVariantType, importsToString, indexed, metaToVariantType, onColumn, qualifiedSyntaxToString, typeLens, typeRelation)
 
 import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
@@ -204,3 +204,24 @@ declarationToVariantType =
 
             _ ->
                 Nothing
+
+
+typeRelation :
+    CodeGen.TypeAnnotation
+    -> CodeGen.TypeAnnotation
+    -> CodeGen.TypeAnnotation
+    -> CodeGen.TypeAnnotation
+typeRelation structure attribute wrap =
+    CodeGen.typed "Relation" [ structure, attribute, wrap ]
+
+
+{-| <https://package.elm-lang.org/packages/erlandsona/elm-accessors/2.1.0/Accessors#Lens>
+-}
+typeLens :
+    CodeGen.TypeAnnotation
+    -> CodeGen.TypeAnnotation
+    -> CodeGen.TypeAnnotation
+    -> CodeGen.TypeAnnotation
+    -> CodeGen.TypeAnnotation
+typeLens structure transformed attribute built =
+    CodeGen.typed "Lens" [ structure, transformed, attribute, built ]

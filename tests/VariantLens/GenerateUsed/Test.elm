@@ -1,5 +1,6 @@
 module VariantLens.GenerateUsed.Test exposing (all)
 
+import Dict
 import Elm.CodeGen as CodeGen
 import Expect
 import Help exposing (declarationToString)
@@ -518,6 +519,8 @@ declarationBuildTestString declarationBuild =
                 , variantValues = [ CodeGen.typeVar "a", CodeGen.typeVar "b", CodeGen.typeVar "c", CodeGen.typeVar "d" ]
                 , typeParameters = [ "a", "b", "c", "d" ]
                 , variantName = "Some"
+                , otherVariants =
+                    Dict.singleton "None" { valueCount = 0 }
                 }
     in
     { name = VariantLens.GenerateUsed.prismNameVariant.build { variantName = "Some" }
