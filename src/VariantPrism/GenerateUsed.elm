@@ -240,15 +240,15 @@ implementation { variantName, variantValues } =
                                 CodeGen.unit
                                 CodeGen.piper
                                 [ CodeGen.fun "variantValuesAlter"
-                                , CodeGen.construct "variantValuesCurryTo"
-                                    [ CodeGen.fun variantName ]
+                                , CodeGen.fun variantName
                                 ]
 
                         [ _ ] ->
-                            CodeGen.construct variantName
-                                [ CodeGen.construct "variantValueAlter"
-                                    [ CodeGen.val ("value" |> indexed 0) ]
-                                    |> CodeGen.parens
+                            CodeGen.binOpChain
+                                (CodeGen.val ("value" |> indexed 0))
+                                CodeGen.piper
+                                [ CodeGen.fun "variantValuesAlter"
+                                , CodeGen.fun variantName
                                 ]
 
                         -- >= 2
