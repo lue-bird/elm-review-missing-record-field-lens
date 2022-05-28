@@ -101,10 +101,11 @@ reported =
         "reported"
         [ test "attempt to fix Lens-able types"
             (\() ->
-                [ """module Data exposing (One (..))
+                [ """module Data exposing (Data(..))
 
-type One
-    = One String
+type Data
+    = Some String
+    | None
 """
                 , """module Use exposing (use)
 
