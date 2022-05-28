@@ -1,11 +1,12 @@
-module Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, importsToString, indexed, metaToVariantType, onRow, qualifiedSyntaxToString)
+module Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, declarationToVariantType, importsToString, indexed, metaToVariantType, onColumn, qualifiedSyntaxToString)
 
 import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
 import Elm.Docs
 import Elm.Pretty as CodeGen
+import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.ModuleName exposing (ModuleName)
-import Elm.Syntax.Node exposing (Node(..))
+import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Location)
 import Elm.Syntax.TypeAnnotation as Type exposing (TypeAnnotation)
 import Elm.Type
@@ -74,9 +75,9 @@ qualifiedSyntaxToString =
     String.join "."
 
 
-onRow : Int -> Int -> Location
-onRow row =
-    \column -> { column = column, row = row }
+onColumn : Int -> Int -> Location
+onColumn column =
+    \row -> { column = column, row = row }
 
 
 declarationToString : CodeGen.Declaration -> String
@@ -169,3 +170,47 @@ qualifiedToSyntax =
 
             name :: qualificationReverse ->
                 ( qualificationReverse |> List.reverse, name )
+
+
+declarationToVariantType :
+    Declaration
+    ->
+        Maybe
+            ( String
+            , { variants :
+                    Dict String (List CodeGen.TypeAnnotation)
+              , parameters : List String
+              }
+            )
+declarationToVariantType =
+    \declaration ->
+        case declaration of
+            Declaration.CustomTypeDeclaration type_ ->
+                case type_.constructors of
+                    -- shouldn't parse
+                    [] ->
+                        Nothing
+
+                    -- in the future? add accessors for 1-constructor-`type`s
+                    [ _ ] ->
+                        Nothing
+
+                    variant0 :: variant1 :: variantsFrom2 ->
+                        ( type_.name |> Node.value
+                        , { parameters =
+                                type_.generics |> List.map Node.value
+                          , variants =
+                                (variant0 :: variant1 :: variantsFrom2)
+                                    |> List.map
+                                        (\(Node _ variant) ->
+                                            ( variant.name |> Node.value
+                                            , variant.arguments |> List.map Node.value
+                                            )
+                                        )
+                                    |> Dict.fromList
+                          }
+                        )
+                            |> Just
+
+            _ ->
+                Nothing

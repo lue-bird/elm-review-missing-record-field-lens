@@ -12,8 +12,8 @@ import VariantPrism.GenerateUsed.Testable exposing (prismDeclarationToCodeGen)
 all : Test
 all =
     describe "NoMissingVariantPrism"
-        [ generates
-        , dontGenerate
+        [ reported
+        , accepted
         , build
         ]
 
@@ -28,19 +28,18 @@ build =
                 VariantPrism.GenerateUsed.accessors
                     |> declarationBuildTestString
                     |> Expect.equal
-                        """{-| Accessor prism for the variant `Some` of the `type Data`.
+                        """{-| Accessor prism for the variant `Data.Some` of the `type Data`.
 
 
 -}
-some :
-    Relation ( ( ( a, b ), c ), d ) reachable wrap -> Relation (Data a b c d) reachable (Maybe wrap)
+some : Lens (Data a b c d) transformed ( a, ( b, ( c, d ) ) ) wrap
 some =
     makeOneToN_
         "Data.Some"
         (\\variantValuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
-                    ( ( ( value0, value1 ), value2 ), value3 ) |> variantValuesAlter |> Just
+                    ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter |> Just
 
                 _ ->
                     Nothing
@@ -49,12 +48,10 @@ some =
             case variantType of
                 Some value0 value1 value2 value3 ->
                     let
-                        ( ( ( alteredValue0, alteredValue1 ), alteredValue2 ), alteredValue3 ) =
-                            variantTagValue value0 value1 value2 value3
+                        ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
+                            ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
                     in
-                    ( ( ( value0, value1 ), value2 ), value3 )
-                        |> variantValuesAlter
-                        |> Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
+                    Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 
                 someNot ->
                     someNot
@@ -66,18 +63,18 @@ some =
                 VariantPrism.GenerateUsed.accessorsBChiquet
                     |> declarationBuildTestString
                     |> Expect.equal
-                        """{-| Accessor prism for the variant `Some` of the `type Data`.
+                        """{-| Accessor prism for the variant `Data.Some` of the `type Data`.
 
 
 -}
 some :
-    Relation ( ( ( a, b ), c ), d ) reachable wrap -> Relation (Data a b c d) reachable (Maybe wrap)
+    Relation ( a, ( b, ( c, d ) ) ) reachable wrap -> Relation (Data a b c d) reachable (Maybe wrap)
 some =
     makeOneToN
         (\\variantValuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
-                    ( ( ( value0, value1 ), value2 ), value3 ) |> variantValuesAlter |> Just
+                    ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter |> Just
 
                 _ ->
                     Nothing
@@ -86,12 +83,10 @@ some =
             case variantType of
                 Some value0 value1 value2 value3 ->
                     let
-                        ( ( ( alteredValue0, alteredValue1 ), alteredValue2 ), alteredValue3 ) =
-                            variantTagValue value0 value1 value2 value3
+                        ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
+                            ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
                     in
-                    ( ( ( value0, value1 ), value2 ), value3 )
-                        |> variantValuesAlter
-                        |> Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
+                    Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 
                 someNot ->
                     someNot
@@ -100,11 +95,47 @@ some =
         ]
 
 
-generates : Test
-generates =
+reported : Test
+reported =
     Test.describe
-        "generates"
-        [ test
+        "reported"
+        [ test "attempt to fix Lens-able types"
+            (\() ->
+                [ """module Data exposing (One (..))
+
+type One
+    = One String
+"""
+                , """module Use exposing (use)
+
+import Data.On
+
+
+use = Data.On.one
+"""
+                ]
+                    |> Review.Test.runOnModules
+                        (VariantPrism.GenerateUsed.rule
+                            { build = VariantPrism.GenerateUsed.accessors
+                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                            , generationModuleIsVariantModuleDotSuffix = "On"
+                            }
+                        )
+                    |> Review.Test.expectErrorsForModules
+                        [ ( "Use"
+                          , [ Review.Test.error
+                                { message = "variant prism generation `module Data.On` missing"
+                                , details =
+                                    [ "Create such an elm file where variant prisms will be generated in."
+                                    , "At the time of writing, [`elm-review` isn't able to generate new files](https://github.com/jfmengels/elm-review/issues/125)."
+                                    ]
+                                , under = "Data.On.one"
+                                }
+                            ]
+                          )
+                        ]
+            )
+        , test
             "multiple variant values, generation module exposing (..)"
             (\() ->
                 [ """module Data.On exposing (..)
@@ -133,7 +164,8 @@ type Data a b c d
                           , [ Review.Test.error
                                 { message = "`import Data.On` missing"
                                 , details =
-                                    [ "Add the variant prism generation `module` `import` through the supplied fix" ]
+                                    [ "Add the variant prism generation `module` `import` through the supplied fix."
+                                    ]
                                 , under = "Data.On.some"
                                 }
                                 |> Review.Test.whenFixed
@@ -145,81 +177,60 @@ use = Data.On.some
 """
                             ]
                           )
+                        , ( "Data.On"
+                          , [ Review.Test.error
+                                { message = "variant prism on `Data.Some` missing"
+                                , details =
+                                    [ "A variant prism with this name is used in other `module`s."
+                                    , "Add the generated prism declaration through the fix."
+                                    ]
+                                , under = "exposing (..)"
+                                }
+                                |> Review.Test.whenFixed
+                                    """module Data.On exposing (some)
 
-                        {- , ( "Data.On"
-                                                     , [ Review.Test.error
-                                                           { message = "prism for variant `Some` missing"
-                                                           , details =
-                                                               [ "A variant prism with this name is used in other `module`s."
-                                                               , "Add the generated prism declaration through the fix."
-                                                               ]
-                                                           , under = "(..)"
-                                                           }
-                                                           |> Review.Test.whenFixed
-                                                               """module Data.On exposing (some)
+import Accessors exposing (Lens, makeOneToN_)
+import Data exposing (Data(..))
 
-                           import Accessors exposing (makeOneToN_)
-                           import Data exposing (Data(..))
+{-| Accessor prism for the variant `Data.Some` of the `type Data`.
 
-                           some :
-                               Relation ( a, ( b, ( c, d ) ) ) reachable wrap
-                               -> Relation (Data a b c d) reachable (Maybe wrap)
-                           some =
-                               makeOneToN_
-                                   "Data.Some"
-                                   (\\valuesAlter variantType ->
-                                       case variantType of
-                                           Some value0 value1 value2 value3 ->
-                                               ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
 
-                                           _ ->
-                                               Nothing
-                                   )
-                                   (\\valuesAlter variantType ->
-                                       case variantType of
-                                           Some value0 value1 value2 value3 ->
-                                               let
-                                                   ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                                                       ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
-                                               in
-                                               Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
+-}
+some : Lens (Data a b c d) transformed ( a, ( b, ( c, d ) ) ) wrap
+some =
+    makeOneToN_
+        "Data.Some"
+        (\\variantValuesAlter variantType ->
+            case variantType of
+                Some value0 value1 value2 value3 ->
+                    ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter |> Just
 
-                                           someNot ->
-                                               someNot
-                                   )"""
-                                                       ]
-                                                     )
-                        -}
+                _ ->
+                    Nothing
+        )
+        (\\variantValuesAlter variantType ->
+            case variantType of
+                Some value0 value1 value2 value3 ->
+                    let
+                        ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
+                            ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
+                    in
+                    Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
+
+                someNot ->
+                    someNot
+        )"""
+                            ]
+                          )
                         ]
             )
         ]
 
 
-dontGenerate : Test
-dontGenerate =
-    describe "doesn't generate"
-        [ test "attempt to fix Lens-able types"
-            (\() ->
-                [ """module Data exposing (One (..))
-
-type One
-    = One String
-"""
-                , """module Use exposing (use)
-
-use = Data.On.one
-"""
-                ]
-                    |> Review.Test.runOnModules
-                        (VariantPrism.GenerateUsed.rule
-                            { build = VariantPrism.GenerateUsed.accessors
-                            , name = VariantPrism.GenerateUsed.prismNameVariant
-                            , generationModuleIsVariantModuleDotSuffix = "On"
-                            }
-                        )
-                    |> Review.Test.expectNoErrors
-            )
-        , test "generate Prism for variants that already have a prism defined."
+accepted : Test
+accepted =
+    describe "accepted"
+        [ test "variant prism already available"
             (\() ->
                 [ """module Data exposing (AlreadyDefined(..))
 
@@ -230,7 +241,14 @@ type AlreadyDefined a
 variantDontError : Prism (AlreadyDefined a) a
 variantDontError = ()
 """
+                , """module Data.On exposing (one)
+
+one = one
+"""
                 , """module Use exposing (use)
+
+import Data.On
+
 
 use = Data.On.one
 """
