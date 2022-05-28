@@ -1,6 +1,7 @@
 module VariantPrism.GenerateUsed.Test exposing (all)
 
 import Elm.CodeGen as CodeGen
+import Elm.Syntax.TypeAnnotation exposing (TypeAnnotation)
 import Expect
 import Help exposing (declarationToString)
 import Review.Test
@@ -137,7 +138,7 @@ use = Data.On.one
                         ]
             )
         , test
-            "multiple variant values, generation module exposing (..)"
+            "multiple variant values, generation `module exposing (..)`"
             (\() ->
                 [ """module Data.On exposing (..)
 """
@@ -226,7 +227,7 @@ some =
                         ]
             )
         , test
-            "single variant value, generation module exposing (..)"
+            "single variant value, generation `module exposing (..)`"
             (\() ->
                 [ """module Data.On exposing (..)
 """
@@ -311,7 +312,7 @@ some =
                         ]
             )
         , test
-            "no variant value, generation module exposing (..)"
+            "no variant value, generation `module exposing (..)`"
             (\() ->
                 [ """module Data.On exposing (..)
 """
@@ -395,6 +396,79 @@ none =
                 noneNot ->
                     noneNot
         )"""
+                            ]
+                          )
+                        ]
+            )
+        , test
+            "single variant value, generation `module` already `exposing` things"
+            (\() ->
+                [ """module Data.On exposing (none)
+
+none = none
+"""
+                , """module Use exposing (use)
+
+import Data.On
+use = Data.On.some
+
+"""
+                , """module Data exposing (Data(..))
+
+type Data
+    = Some String
+    | None
+"""
+                ]
+                    |> Review.Test.runOnModules
+                        (VariantPrism.GenerateUsed.rule
+                            { build = VariantPrism.GenerateUsed.accessors
+                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                            , generationModuleIsVariantModuleDotSuffix = "On"
+                            }
+                        )
+                    |> Review.Test.expectErrorsForModules
+                        [ ( "Data.On"
+                          , [ Review.Test.error
+                                { message = "variant prism on `Data.Some` missing"
+                                , details =
+                                    [ "A variant prism with this name is used in other `module`s."
+                                    , "Add the generated prism declaration through the fix."
+                                    ]
+                                , under = "exposing (none)"
+                                }
+                                |> Review.Test.whenFixed
+                                    """module Data.On exposing (some, none)
+
+import Accessors exposing (Lens, makeOneToN_)
+import Data exposing (Data(..))
+
+{-| Accessor prism for the variant `Data.Some` of the `type Data`.
+
+
+-}
+some : Lens Data transformed String wrap
+some =
+    makeOneToN_
+        "Data.Some"
+        (\\variantValuesAlter variantType ->
+            case variantType of
+                Some value0 ->
+                    value0 |> variantValuesAlter |> Just
+
+                _ ->
+                    Nothing
+        )
+        (\\variantValuesAlter variantType ->
+            case variantType of
+                Some value0 ->
+                    value0 |> variantValuesAlter |> Some
+
+                someNot ->
+                    someNot
+        )
+none = none
+"""
                             ]
                           )
                         ]
