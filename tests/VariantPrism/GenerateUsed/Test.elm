@@ -310,6 +310,95 @@ some =
                           )
                         ]
             )
+        , test
+            "no variant value, generation module exposing (..)"
+            (\() ->
+                [ """module Data.On exposing (..)
+"""
+                , """module Use exposing (use)
+
+use = Data.On.none
+
+"""
+                , """module Data exposing (Data(..))
+
+type Data
+    = Some String
+    | None
+"""
+                ]
+                    |> Review.Test.runOnModules
+                        (VariantPrism.GenerateUsed.rule
+                            { build = VariantPrism.GenerateUsed.accessors
+                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                            , generationModuleIsVariantModuleDotSuffix = "On"
+                            }
+                        )
+                    |> Review.Test.expectErrorsForModules
+                        [ ( "Use"
+                          , [ Review.Test.error
+                                { message = "`import Data.On` missing"
+                                , details =
+                                    [ "Add the variant prism generation `module` `import` through the supplied fix."
+                                    ]
+                                , under = "Data.On.some"
+                                }
+                                |> Review.Test.whenFixed
+                                    """module Use exposing (use)
+
+import Data.On
+use = Data.On.none
+
+"""
+                            ]
+                          )
+                        , ( "Data.On"
+                          , [ Review.Test.error
+                                { message = "variant prism on `Data.None` missing"
+                                , details =
+                                    [ "A variant prism with this name is used in other `module`s."
+                                    , "Add the generated prism declaration through the fix."
+                                    ]
+                                , under = "exposing (..)"
+                                }
+                                |> Review.Test.whenFixed
+                                    """module Data.On exposing (none)
+
+import Accessors exposing (Lens, makeOneToN_)
+import Data exposing (Data(..))
+
+{-| Accessor prism for the variant `Data.None` of the `type Data`.
+
+
+-}
+none : Lens Data transformed () wrap
+none =
+    makeOneToN_
+        "Data.None"
+        (\\variantValuesAlter variantType ->
+            case variantType of
+                None ->
+                    () |> variantValuesAlter |> Just
+
+                _ ->
+                    Nothing
+        )
+        (\\variantValuesAlter variantType ->
+            case variantType of
+                None ->
+                    let 
+                        () =
+                            () |> variantValuesAlter
+                    in
+                    None
+
+                noneNot ->
+                    noneNot
+        )"""
+                            ]
+                          )
+                        ]
+            )
         ]
 
 
