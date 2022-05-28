@@ -3,7 +3,7 @@ module VariantLens.GenerateUsed exposing
     , VariantLensBuild
     , accessors, accessorsBChiquet
     , documented, annotated, importsAdd
-    , implementation
+    , variantAmongMultipleImplementation, variantOnlyImplementation
     , VariantLensNameConfig, prismNameVariant, prismNameOnVariant
     )
 
@@ -17,7 +17,7 @@ module VariantLens.GenerateUsed exposing
 @docs VariantLensBuild
 @docs accessors, accessorsBChiquet
 @docs documented, annotated, importsAdd
-@docs implementation
+@docs variantAmongMultipleImplementation, variantOnlyImplementation
 
 
 ## name
@@ -36,7 +36,7 @@ import Elm.Syntax.Import exposing (Import)
 import Elm.Syntax.Module as Module exposing (Module)
 import Elm.Syntax.Node as Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Range)
-import Hand exposing (Empty, Hand(..))
+import Hand exposing (Hand(..))
 import Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, declarationToVariantType, importsToString, indexed, metaToVariantType, onColumn, qualifiedSyntaxToString, typeLens, typeRelation)
 import Parser exposing ((|.), (|=), Parser)
 import RecordWithoutConstructorFunction exposing (RecordWithoutConstructorFunction)
@@ -138,15 +138,70 @@ type alias Config =
         }
 
 
-{-| Helpers for values of a given variant in the form
+{-| Helpers for values of a given only variant.
 
-with
+for
+
+    type Id attachment
+        = Id (List Int) attachment
+
+
+#### `access`
+
+    \(Id value0 value1) -> ( value0, value1 )
+
+
+#### `alter`
+
+    \variantValuesAlter (Id value0 value1) ->
+        let
+            ( alteredValue0, alteredValue1 ) =
+                ( value0, value1 ) |> variantValuesAlter
+        in
+        Id alteredValue0 alteredValue1
+
+-}
+variantOnlyImplementation :
+    { variantName : String
+    , variantValues : List CodeGen.TypeAnnotation
+    }
+    ->
+        { access : CodeGen.Expression
+        , alter : CodeGen.Expression
+        }
+variantOnlyImplementation { variantName, variantValues } =
+    { access =
+        let
+            ( variantPattern, access ) =
+                variantAccess
+                    { variantValues = variantValues
+                    , variantName = variantName
+                    }
+        in
+        CodeGen.lambda [ variantPattern ] access
+    , alter =
+        let
+            ( variantPattern, alter ) =
+                variantAlter
+                    { variantValues = variantValues
+                    , variantName = variantName
+                    }
+        in
+        CodeGen.lambda
+            [ CodeGen.varPattern "variantValuesAlter"
+            , variantPattern
+            ]
+            alter
+    }
+
+
+{-| Helpers for values of a given variant among >= 2.
+
+for
 
     type Data a b c d
         = Some a b c d
         | None
-
-generates
 
 
 #### `access`
@@ -175,157 +230,49 @@ generates
                 someNot
 
 -}
-implementation :
+variantAmongMultipleImplementation :
     { variantName : String
     , variantValues : List CodeGen.TypeAnnotation
-    , otherVariants : Dict String { valueCount : Int }
     }
     ->
         { access : CodeGen.Expression
         , alter : CodeGen.Expression
         }
-implementation { variantName, variantValues, otherVariants } =
+variantAmongMultipleImplementation { variantName, variantValues } =
     { access =
-        if otherVariants |> Dict.isEmpty then
-            CodeGen.lambda
-                [ CodeGen.varPattern "variantValuesAlter"
-                , CodeGen.namedPattern variantName
-                    (variantValues
-                        |> List.indexedMap
-                            (\index _ ->
-                                CodeGen.varPattern ("value" |> indexed index)
-                            )
-                    )
+        CodeGen.lambda
+            [ CodeGen.varPattern "variantValuesAlter"
+            , CodeGen.varPattern "variantType"
+            ]
+            (CodeGen.caseExpr (CodeGen.val "variantType")
+                [ variantAccess
+                    { variantValues = variantValues
+                    , variantName = variantName
+                    }
+                    |> Tuple.mapSecond
+                        (\access ->
+                            CodeGen.binOpChain
+                                access
+                                CodeGen.piper
+                                [ CodeGen.fun "variantValuesAlter"
+                                , CodeGen.fun "Just"
+                                ]
+                        )
+                , ( CodeGen.allPattern
+                  , CodeGen.val "Nothing"
+                  )
                 ]
-                (CodeGen.applyBinOp
-                    (case variantValues of
-                        [] ->
-                            CodeGen.unit
-
-                        top :: down ->
-                            Stack.topDown top down
-                                |> Stack.map
-                                    (\{ index } _ ->
-                                        CodeGen.val ("value" |> indexed index)
-                                    )
-                                |> Stack.reverse
-                                |> Stack.fold (\value soFar -> CodeGen.tuple [ value, soFar ])
-                    )
-                    CodeGen.piper
-                    (CodeGen.fun "variantValuesAlter")
-                )
-
-        else
-            CodeGen.lambda
-                [ CodeGen.varPattern "variantValuesAlter"
-                , CodeGen.varPattern "variantType"
-                ]
-                (CodeGen.caseExpr (CodeGen.val "variantType")
-                    [ ( CodeGen.namedPattern variantName
-                            (variantValues
-                                |> List.indexedMap
-                                    (\index _ ->
-                                        CodeGen.varPattern ("value" |> indexed index)
-                                    )
-                            )
-                      , CodeGen.binOpChain
-                            (case variantValues of
-                                [] ->
-                                    CodeGen.unit
-
-                                top :: down ->
-                                    Stack.topDown top down
-                                        |> Stack.map
-                                            (\{ index } _ ->
-                                                CodeGen.val ("value" |> indexed index)
-                                            )
-                                        |> Stack.reverse
-                                        |> Stack.fold (\value soFar -> CodeGen.tuple [ value, soFar ])
-                            )
-                            CodeGen.piper
-                            [ CodeGen.fun "variantValuesAlter"
-                            , CodeGen.fun "Just"
-                            ]
-                      )
-                    , ( CodeGen.allPattern
-                      , CodeGen.val "Nothing"
-                      )
-                    ]
-                )
+            )
     , alter =
         CodeGen.lambda
             [ CodeGen.varPattern "variantValuesAlter"
             , CodeGen.varPattern "variantType"
             ]
             (CodeGen.caseExpr (CodeGen.val "variantType")
-                [ ( CodeGen.namedPattern
-                        variantName
-                        (variantValues
-                            |> List.indexedMap
-                                (\index _ ->
-                                    CodeGen.varPattern ("value" |> indexed index)
-                                )
-                        )
-                  , case variantValues of
-                        [] ->
-                            CodeGen.letExpr
-                                [ CodeGen.letDestructuring
-                                    CodeGen.unitPattern
-                                    (CodeGen.applyBinOp
-                                        CodeGen.unit
-                                        CodeGen.piper
-                                        (CodeGen.fun "variantValuesAlter")
-                                    )
-                                ]
-                                (CodeGen.val variantName)
-
-                        [ _ ] ->
-                            CodeGen.binOpChain
-                                (CodeGen.val ("value" |> indexed 0))
-                                CodeGen.piper
-                                [ CodeGen.fun "variantValuesAlter"
-                                , CodeGen.fun variantName
-                                ]
-
-                        -- >= 2
-                        element0 :: element1 :: elements2Up ->
-                            let
-                                variantValuesStack =
-                                    Stack.topDown element0 (element1 :: elements2Up)
-                            in
-                            CodeGen.letExpr
-                                [ CodeGen.letDestructuring
-                                    (variantValuesStack
-                                        |> Stack.map
-                                            (\{ index } _ ->
-                                                CodeGen.varPattern ("alteredValue" |> indexed index)
-                                            )
-                                        |> Stack.reverse
-                                        |> Stack.fold (\value soFar -> CodeGen.tuplePattern [ value, soFar ])
-                                    )
-                                    (CodeGen.applyBinOp
-                                        (variantValuesStack
-                                            |> Stack.map
-                                                (\{ index } _ ->
-                                                    CodeGen.val ("value" |> indexed index)
-                                                )
-                                            |> Stack.reverse
-                                            |> Stack.fold (\value soFar -> CodeGen.tuple [ value, soFar ])
-                                        )
-                                        CodeGen.piper
-                                        (CodeGen.fun "variantValuesAlter")
-                                    )
-                                ]
-                                (CodeGen.construct variantName
-                                    (variantValuesStack
-                                        |> Stack.map
-                                            (\{ index } _ ->
-                                                CodeGen.val ("alteredValue" |> indexed index)
-                                            )
-                                        |> Stack.toList
-                                    )
-                                )
-                  )
+                [ variantAlter
+                    { variantValues = variantValues
+                    , variantName = variantName
+                    }
                 , let
                     variantNot =
                         (variantName |> char0ToLower) ++ "Not"
@@ -336,6 +283,109 @@ implementation { variantName, variantValues, otherVariants } =
                 ]
             )
     }
+
+
+variantAccess :
+    { variantValues : List CodeGen.TypeAnnotation
+    , variantName : String
+    }
+    -> ( CodeGen.Pattern, CodeGen.Expression )
+variantAccess { variantValues, variantName } =
+    ( CodeGen.namedPattern variantName
+        (variantValues
+            |> List.indexedMap
+                (\index _ ->
+                    CodeGen.varPattern ("value" |> indexed index)
+                )
+        )
+    , case variantValues of
+        [] ->
+            CodeGen.unit
+
+        top :: down ->
+            Stack.topDown top down
+                |> Stack.map
+                    (\{ index } _ ->
+                        CodeGen.val ("value" |> indexed index)
+                    )
+                |> Stack.reverse
+                |> Stack.fold (\value soFar -> CodeGen.tuple [ value, soFar ])
+    )
+
+
+variantAlter :
+    { variantValues : List CodeGen.TypeAnnotation
+    , variantName : String
+    }
+    -> ( CodeGen.Pattern, CodeGen.Expression )
+variantAlter { variantValues, variantName } =
+    ( CodeGen.namedPattern variantName
+        (variantValues
+            |> List.indexedMap
+                (\index _ ->
+                    CodeGen.varPattern ("value" |> indexed index)
+                )
+        )
+    , case variantValues of
+        [] ->
+            CodeGen.letExpr
+                [ CodeGen.letDestructuring
+                    CodeGen.unitPattern
+                    (CodeGen.applyBinOp
+                        CodeGen.unit
+                        CodeGen.piper
+                        (CodeGen.fun "variantValuesAlter")
+                    )
+                ]
+                (CodeGen.val variantName)
+
+        [ _ ] ->
+            CodeGen.binOpChain
+                (CodeGen.val ("value" |> indexed 0))
+                CodeGen.piper
+                [ CodeGen.fun "variantValuesAlter"
+                , CodeGen.fun variantName
+                ]
+
+        -- >= 2
+        element0 :: element1 :: elements2Up ->
+            let
+                variantValuesStack =
+                    Stack.topDown element0 (element1 :: elements2Up)
+            in
+            CodeGen.letExpr
+                [ CodeGen.letDestructuring
+                    (variantValuesStack
+                        |> Stack.map
+                            (\{ index } _ ->
+                                CodeGen.varPattern ("alteredValue" |> indexed index)
+                            )
+                        |> Stack.reverse
+                        |> Stack.fold (\value soFar -> CodeGen.tuplePattern [ value, soFar ])
+                    )
+                    (CodeGen.applyBinOp
+                        (variantValuesStack
+                            |> Stack.map
+                                (\{ index } _ ->
+                                    CodeGen.val ("value" |> indexed index)
+                                )
+                            |> Stack.reverse
+                            |> Stack.fold (\value soFar -> CodeGen.tuple [ value, soFar ])
+                        )
+                        CodeGen.piper
+                        (CodeGen.fun "variantValuesAlter")
+                    )
+                ]
+                (CodeGen.construct variantName
+                    (variantValuesStack
+                        |> Stack.map
+                            (\{ index } _ ->
+                                CodeGen.val ("alteredValue" |> indexed index)
+                            )
+                        |> Stack.toList
+                    )
+                )
+    )
 
 
 {-| [`VariantLensBuild`](#VariantLensBuild)
@@ -395,12 +445,18 @@ generates
 accessors : VariantLensBuild
 accessors =
     \{ variantName, typeName, variantValues, typeParameters, variantModule, otherVariants } ->
+        let
+            qualifiedVariantName =
+                [ variantModule, ".", variantName ]
+                    |> String.concat
+        in
         { imports =
             [ CodeGen.importStmt [ "Accessors" ]
                 Nothing
                 ([ CodeGen.typeOrAliasExpose "Relation"
                  , CodeGen.typeOrAliasExpose "Lens"
                  , CodeGen.funExpose "makeOneToN_"
+                 , CodeGen.funExpose "makeOneToOne_"
                  ]
                     |> CodeGen.exposeExplicit
                     |> Just
@@ -410,9 +466,7 @@ accessors =
             CodeGen.emptyDocComment
                 |> CodeGen.markdown
                     ([ "Accessor lens for the variant `"
-                     , variantModule
-                     , "."
-                     , variantName
+                     , qualifiedVariantName
                      , "` of the `type "
                      , typeName
                      , "`."
@@ -458,19 +512,33 @@ accessors =
             )
                 |> Just
         , implementation =
-            let
-                { access, alter } =
-                    implementation
-                        { variantName = variantName
-                        , variantValues = variantValues
-                        , otherVariants = otherVariants
-                        }
-            in
-            CodeGen.construct "makeOneToN_"
-                [ CodeGen.string (variantModule ++ "." ++ variantName)
-                , access
-                , alter
-                ]
+            if otherVariants |> Dict.isEmpty then
+                let
+                    { access, alter } =
+                        variantOnlyImplementation
+                            { variantName = variantName
+                            , variantValues = variantValues
+                            }
+                in
+                CodeGen.construct "makeOneToOne_"
+                    [ CodeGen.string qualifiedVariantName
+                    , access
+                    , alter
+                    ]
+
+            else
+                let
+                    { access, alter } =
+                        variantAmongMultipleImplementation
+                            { variantName = variantName
+                            , variantValues = variantValues
+                            }
+                in
+                CodeGen.construct "makeOneToN_"
+                    [ CodeGen.string qualifiedVariantName
+                    , access
+                    , alter
+                    ]
         }
 
 
@@ -495,7 +563,7 @@ generates
 
     module Data.On exposing (some)
 
-    import Accessors exposing (makeOneToN_)
+    import Accessors exposing (Lens, Relation, makeOneToN_)
     import Data exposing (Data(..))
 
     {-| Accessor lens for the variant `Data.Some` of the `type Data`.
@@ -535,6 +603,7 @@ accessorsBChiquet =
                 Nothing
                 ([ CodeGen.typeOrAliasExpose "Relation"
                  , CodeGen.funExpose "makeOneToN"
+                 , CodeGen.funExpose "makeOneToOne"
                  ]
                     |> CodeGen.exposeExplicit
                     |> Just
@@ -583,15 +652,25 @@ accessorsBChiquet =
                 )
                 |> Just
         , implementation =
-            let
-                { access, alter } =
-                    implementation
-                        { variantName = variantName
-                        , variantValues = variantValues
-                        , otherVariants = otherVariants
-                        }
-            in
-            CodeGen.construct "makeOneToN" [ access, alter ]
+            if otherVariants |> Dict.isEmpty then
+                let
+                    { access, alter } =
+                        variantOnlyImplementation
+                            { variantName = variantName
+                            , variantValues = variantValues
+                            }
+                in
+                CodeGen.construct "makeOneToOne" [ access, alter ]
+
+            else
+                let
+                    { access, alter } =
+                        variantAmongMultipleImplementation
+                            { variantName = variantName
+                            , variantValues = variantValues
+                            }
+                in
+                CodeGen.construct "makeOneToN" [ access, alter ]
         }
 
 
@@ -711,7 +790,10 @@ Out of the box, there are
   - [`accessorsBChiquet`](#accessorsBChiquet)
 
 You can customize existing variant lens declarations with [`documented`](#documented) and [`annotated`](#annotated)
-or create a custom lens generator ([the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest), [`implementation`](#implementation) can be helpful).
+or create a custom lens generator.
+[the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest),
+[`variantAmongMultipleImplementation`](#variantAmongMultipleImplementation),
+[`variantOnlyImplementation`](#variantOnlyImplementation) will help you do that.
 
     customLensGenerator : VariantLensBuild
     customLensGenerator { variantName, typeName, typeParameters, variantValues } =
@@ -1561,7 +1643,9 @@ generateForModule { usedVariantOriginModule, variantModuleName, maybeGenerationM
                                                 , typeParameters = variantType.parameters
                                                 , variantName = variantName
                                                 , variantValues = variantValues
-                                                , otherVariants = variantValueCounts |> Dict.remove variantName
+                                                , otherVariants =
+                                                    variantValueCounts
+                                                        |> Dict.remove variantName
                                                 }
 
                                         builtName =
