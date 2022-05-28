@@ -1,18 +1,17 @@
-module VariantPrism.GenerateUsed.Test exposing (all)
+module VariantLens.GenerateUsed.Test exposing (all)
 
 import Elm.CodeGen as CodeGen
-import Elm.Syntax.TypeAnnotation exposing (TypeAnnotation)
 import Expect
 import Help exposing (declarationToString)
 import Review.Test
 import Test exposing (Test, describe, test)
-import VariantPrism.GenerateUsed
-import VariantPrism.GenerateUsed.Testable exposing (prismDeclarationToCodeGen)
+import VariantLens.GenerateUsed
+import VariantLens.GenerateUsed.Testable exposing (prismDeclarationToCodeGen)
 
 
 all : Test
 all =
-    describe "NoMissingVariantPrism"
+    describe "VariantLens.GenerateUsed"
         [ reported
         , accepted
         , build
@@ -26,10 +25,10 @@ build =
         [ test
             "accessors"
             (\() ->
-                VariantPrism.GenerateUsed.accessors
+                VariantLens.GenerateUsed.accessors
                     |> declarationBuildTestString
                     |> Expect.equal
-                        """{-| Accessor prism for the variant `Data.Some` of the `type Data`.
+                        """{-| Accessor lens for the variant `Data.Some` of the `type Data`.
 
 
 -}
@@ -61,10 +60,10 @@ some =
         , test
             "accessorsBChiquet"
             (\() ->
-                VariantPrism.GenerateUsed.accessorsBChiquet
+                VariantLens.GenerateUsed.accessorsBChiquet
                     |> declarationBuildTestString
                     |> Expect.equal
-                        """{-| Accessor prism for the variant `Data.Some` of the `type Data`.
+                        """{-| Accessor lens for the variant `Data.Some` of the `type Data`.
 
 
 -}
@@ -117,16 +116,16 @@ use = Data.On.one
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantPrism.GenerateUsed.rule
-                            { build = VariantPrism.GenerateUsed.accessors
-                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                        (VariantLens.GenerateUsed.rule
+                            { build = VariantLens.GenerateUsed.accessors
+                            , name = VariantLens.GenerateUsed.prismNameVariant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
                         )
                     |> Review.Test.expectErrorsForModules
                         [ ( "Use"
                           , [ Review.Test.error
-                                { message = "variant prism generation `module Data.On` missing"
+                                { message = "variant lens generation `module Data.On` missing"
                                 , details =
                                     [ "Create such an elm file where variant prisms will be generated in."
                                     , "At the time of writing, [`elm-review` isn't able to generate new files](https://github.com/jfmengels/elm-review/issues/125)."
@@ -155,9 +154,9 @@ type Data a b c d
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantPrism.GenerateUsed.rule
-                            { build = VariantPrism.GenerateUsed.accessors
-                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                        (VariantLens.GenerateUsed.rule
+                            { build = VariantLens.GenerateUsed.accessors
+                            , name = VariantLens.GenerateUsed.prismNameVariant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
                         )
@@ -166,7 +165,7 @@ type Data a b c d
                           , [ Review.Test.error
                                 { message = "`import Data.On` missing"
                                 , details =
-                                    [ "Add the variant prism generation `module` `import` through the supplied fix."
+                                    [ "Add the variant lens generation `module` `import` through the supplied fix."
                                     ]
                                 , under = "Data.On.some"
                                 }
@@ -181,10 +180,10 @@ use = Data.On.some
                           )
                         , ( "Data.On"
                           , [ Review.Test.error
-                                { message = "variant prism on `Data.Some` missing"
+                                { message = "variant lens on `Data.Some` missing"
                                 , details =
-                                    [ "A variant prism with this name is used in other `module`s."
-                                    , "Add the generated prism declaration through the fix."
+                                    [ "A variant lens with this name is used in other `module`s."
+                                    , "Add the generated lens declaration through the fix."
                                     ]
                                 , under = "exposing (..)"
                                 }
@@ -194,7 +193,7 @@ use = Data.On.some
 import Accessors exposing (Lens, makeOneToN_)
 import Data exposing (Data(..))
 
-{-| Accessor prism for the variant `Data.Some` of the `type Data`.
+{-| Accessor lens for the variant `Data.Some` of the `type Data`.
 
 
 -}
@@ -244,9 +243,9 @@ type Data
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantPrism.GenerateUsed.rule
-                            { build = VariantPrism.GenerateUsed.accessors
-                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                        (VariantLens.GenerateUsed.rule
+                            { build = VariantLens.GenerateUsed.accessors
+                            , name = VariantLens.GenerateUsed.prismNameVariant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
                         )
@@ -255,7 +254,7 @@ type Data
                           , [ Review.Test.error
                                 { message = "`import Data.On` missing"
                                 , details =
-                                    [ "Add the variant prism generation `module` `import` through the supplied fix."
+                                    [ "Add the variant lens generation `module` `import` through the supplied fix."
                                     ]
                                 , under = "Data.On.some"
                                 }
@@ -270,10 +269,10 @@ use = Data.On.some
                           )
                         , ( "Data.On"
                           , [ Review.Test.error
-                                { message = "variant prism on `Data.Some` missing"
+                                { message = "variant lens on `Data.Some` missing"
                                 , details =
-                                    [ "A variant prism with this name is used in other `module`s."
-                                    , "Add the generated prism declaration through the fix."
+                                    [ "A variant lens with this name is used in other `module`s."
+                                    , "Add the generated lens declaration through the fix."
                                     ]
                                 , under = "exposing (..)"
                                 }
@@ -283,7 +282,7 @@ use = Data.On.some
 import Accessors exposing (Lens, makeOneToN_)
 import Data exposing (Data(..))
 
-{-| Accessor prism for the variant `Data.Some` of the `type Data`.
+{-| Accessor lens for the variant `Data.Some` of the `type Data`.
 
 
 -}
@@ -329,9 +328,9 @@ type Data
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantPrism.GenerateUsed.rule
-                            { build = VariantPrism.GenerateUsed.accessors
-                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                        (VariantLens.GenerateUsed.rule
+                            { build = VariantLens.GenerateUsed.accessors
+                            , name = VariantLens.GenerateUsed.prismNameVariant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
                         )
@@ -340,7 +339,7 @@ type Data
                           , [ Review.Test.error
                                 { message = "`import Data.On` missing"
                                 , details =
-                                    [ "Add the variant prism generation `module` `import` through the supplied fix."
+                                    [ "Add the variant lens generation `module` `import` through the supplied fix."
                                     ]
                                 , under = "Data.On.none"
                                 }
@@ -355,10 +354,10 @@ use = Data.On.none
                           )
                         , ( "Data.On"
                           , [ Review.Test.error
-                                { message = "variant prism on `Data.None` missing"
+                                { message = "variant lens on `Data.None` missing"
                                 , details =
-                                    [ "A variant prism with this name is used in other `module`s."
-                                    , "Add the generated prism declaration through the fix."
+                                    [ "A variant lens with this name is used in other `module`s."
+                                    , "Add the generated lens declaration through the fix."
                                     ]
                                 , under = "exposing (..)"
                                 }
@@ -368,7 +367,7 @@ use = Data.On.none
 import Accessors exposing (Lens, makeOneToN_)
 import Data exposing (Data(..))
 
-{-| Accessor prism for the variant `Data.None` of the `type Data`.
+{-| Accessor lens for the variant `Data.None` of the `type Data`.
 
 
 -}
@@ -421,19 +420,19 @@ type Data
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantPrism.GenerateUsed.rule
-                            { build = VariantPrism.GenerateUsed.accessors
-                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                        (VariantLens.GenerateUsed.rule
+                            { build = VariantLens.GenerateUsed.accessors
+                            , name = VariantLens.GenerateUsed.prismNameVariant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
                         )
                     |> Review.Test.expectErrorsForModules
                         [ ( "Data.On"
                           , [ Review.Test.error
-                                { message = "variant prism on `Data.Some` missing"
+                                { message = "variant lens on `Data.Some` missing"
                                 , details =
-                                    [ "A variant prism with this name is used in other `module`s."
-                                    , "Add the generated prism declaration through the fix."
+                                    [ "A variant lens with this name is used in other `module`s."
+                                    , "Add the generated lens declaration through the fix."
                                     ]
                                 , under = "exposing (none)"
                                 }
@@ -443,7 +442,7 @@ type Data
 import Accessors exposing (Lens, makeOneToN_)
 import Data exposing (Data(..))
 
-{-| Accessor prism for the variant `Data.Some` of the `type Data`.
+{-| Accessor lens for the variant `Data.Some` of the `type Data`.
 
 
 -}
@@ -479,16 +478,12 @@ none = none
 accepted : Test
 accepted =
     describe "accepted"
-        [ test "variant prism already available"
+        [ test "variant lens already available"
             (\() ->
-                [ """module Data exposing (AlreadyDefined(..))
+                [ """module Data exposing (One(..))
 
-type AlreadyDefined a
-    = DontError a
-    | Whatever
-
-variantDontError : Prism (AlreadyDefined a) a
-variantDontError = ()
+type One
+    = One String
 """
                 , """module Data.On exposing (one)
 
@@ -503,9 +498,9 @@ use = Data.On.one
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantPrism.GenerateUsed.rule
-                            { build = VariantPrism.GenerateUsed.accessors
-                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                        (VariantLens.GenerateUsed.rule
+                            { build = VariantLens.GenerateUsed.accessors
+                            , name = VariantLens.GenerateUsed.prismNameVariant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
                         )
@@ -525,7 +520,7 @@ declarationBuildTestString declarationBuild =
                 , variantName = "Some"
                 }
     in
-    { name = VariantPrism.GenerateUsed.prismNameVariant.build { variantName = "Some" }
+    { name = VariantLens.GenerateUsed.prismNameVariant.build { variantName = "Some" }
     , documentation = built.documentation
     , annotation = built.annotation
     , implementation = built.implementation

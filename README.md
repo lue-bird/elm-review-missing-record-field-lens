@@ -2,7 +2,7 @@ Despite what the name suggests,
 this package contains _multiple_ [`elm-review`](https://package.elm-lang.org/packages/jfmengels/elm-review/latest/) rules to help with automatic code generation based on use:
 
   - [`NoMissingRecordFieldLens`](#NoMissingRecordFieldLens)
-  - [`VariantPrism.GenerateUsed`](#VariantPrism.GenerateUsed)
+  - [`VariantLens.GenerateUsed`](#VariantLens.GenerateUsed)
 
 When [`lue-bird/generate-elm`](https://github.com/lue-bird/generate-elm) – a framework for making code generation easy and safe –
 is finished, every functionality will be ported over.
@@ -110,7 +110,7 @@ Methods like this make your code more **readable**. Compare with the first examp
 
 In the last examples
 - `projects`, `calls` lenses will be generated in `module Field`
-- `onFilled` prism will be generated in `module Hand.Extra.Local` by [`VariantPrism.GenerateUsed`](#VariantPrism.GenerateUsed) 
+- `onFilled` lens will be generated in `module Hand.Extra.Local` by [`VariantLens.GenerateUsed`](#VariantLens.GenerateUsed) 
 
 ### try without installing
 
@@ -197,12 +197,12 @@ Make sure to make types, packages, ... out of these.
 Don't [obsessively employ primitives](https://elm-radio.com/episode/primitive-obsession/).
 
 
-## `VariantPrism.GenerateUsed`
+## `VariantLens.GenerateUsed`
 
 The motivations for using this are similar to [`NoMissingRecordFieldLens`](#NoMissingRecordFieldLens),
 this time trying to cut down on situations where you're only interested in values of one variant.
 
-With the [`Config`](VariantPrism-GenerateUsed#Config) below,
+With the [`Config`](VariantLens-GenerateUsed#Config) below,
 calling `YourVariantType.onOneOfThree`,
 the rule will automatically
 - `import YourVariantType.Extra.Local as YourVariantType`
@@ -220,18 +220,18 @@ elm-review --template lue-bird/elm-review-missing-record-field-lens/example/vari
 module ReviewConfig exposing (config)
 
 import Review.Rule as Rule exposing (Rule)
-import VariantPrism.GenerateUsed
+import VariantLens.GenerateUsed
 
 config : List Rule
 config =
-    [ VariantPrism.GenerateUsed.rule
-        { build = VariantPrism.GenerateUsed.accessors
-        , name = VariantPrism.GenerateUsed.prismNameVariant
+    [ VariantLens.GenerateUsed.rule
+        { build = VariantLens.GenerateUsed.accessors
+        , name = VariantLens.GenerateUsed.prismNameVariant
         , generationModuleIsVariantModuleDotSuffix = "On"
         }
     ]
 ```
-**Check out [`Config`](VariantPrism-GenerateUsed#Config)!**
+**Check out [`Config`](VariantLens-GenerateUsed#Config)!**
 
 ### prisms that work out of the box
 

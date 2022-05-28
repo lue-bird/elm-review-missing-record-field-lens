@@ -1,4 +1,4 @@
-module VariantPrism.GenerateUsed.Testable exposing (prismDeclarationToCodeGen)
+module VariantLens.GenerateUsed.Testable exposing (prismDeclarationToCodeGen)
 
 import Elm.CodeGen as CodeGen
 

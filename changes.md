@@ -6,7 +6,7 @@
     - `NoMissingRecordFieldLens.accessors` changed to generate for [`erlandsona/elm-accessors`](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/)
     - `NoMissingRecordFieldLens.accessorsBChiquet` added
     - changed to more descriptive generation names
-- added `VariantPrism.GenerateUsed` (initiated by [@erlandsona](https://github.com/erlandsona))
+- added `VariantLens.GenerateUsed` (initiated by [@erlandsona](https://github.com/erlandsona))
 
 #### 1.0.2
 

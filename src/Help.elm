@@ -186,31 +186,21 @@ declarationToVariantType =
     \declaration ->
         case declaration of
             Declaration.CustomTypeDeclaration type_ ->
-                case type_.constructors of
-                    -- shouldn't parse
-                    [] ->
-                        Nothing
-
-                    -- in the future? add accessors for 1-constructor-`type`s
-                    [ _ ] ->
-                        Nothing
-
-                    variant0 :: variant1 :: variantsFrom2 ->
-                        ( type_.name |> Node.value
-                        , { parameters =
-                                type_.generics |> List.map Node.value
-                          , variants =
-                                (variant0 :: variant1 :: variantsFrom2)
-                                    |> List.map
-                                        (\(Node _ variant) ->
-                                            ( variant.name |> Node.value
-                                            , variant.arguments |> List.map Node.value
-                                            )
-                                        )
-                                    |> Dict.fromList
-                          }
-                        )
-                            |> Just
+                ( type_.name |> Node.value
+                , { parameters =
+                        type_.generics |> List.map Node.value
+                  , variants =
+                        type_.constructors
+                            |> List.map
+                                (\(Node _ variant) ->
+                                    ( variant.name |> Node.value
+                                    , variant.arguments |> List.map Node.value
+                                    )
+                                )
+                            |> Dict.fromList
+                  }
+                )
+                    |> Just
 
             _ ->
                 Nothing

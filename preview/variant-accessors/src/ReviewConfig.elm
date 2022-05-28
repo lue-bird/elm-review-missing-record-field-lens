@@ -12,13 +12,13 @@ when inside the directory containing this file.
 -}
 
 import Review.Rule as Rule exposing (Rule)
-import VariantPrism.GenerateUsed
+import VariantLens.GenerateUsed
 
 config : List Rule
 config =
-    [ VariantPrism.GenerateUsed.rule
-        { build = VariantPrism.GenerateUsed.accessors
-        , name = VariantPrism.GenerateUsed.prismNameVariant
+    [ VariantLens.GenerateUsed.rule
+        { build = VariantLens.GenerateUsed.accessors
+        , name = VariantLens.GenerateUsed.prismNameVariant
         , generationModuleIsVariantModuleDotSuffix = "On"
         }
     ]

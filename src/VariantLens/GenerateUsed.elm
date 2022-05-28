@@ -1,20 +1,20 @@
-module VariantPrism.GenerateUsed exposing
+module VariantLens.GenerateUsed exposing
     ( rule
-    , VariantPrismBuild
+    , VariantLensBuild
     , accessors, accessorsBChiquet
     , documented, annotated, importsAdd
     , implementation
-    , VariantPrismNameConfig, prismNameVariant, prismNameOnVariant
+    , VariantLensNameConfig, prismNameVariant, prismNameOnVariant
     )
 
-{-|
+{-| Generate lenses for variant values
 
 @docs rule
 
 
 ## build
 
-@docs VariantPrismBuild
+@docs VariantLensBuild
 @docs accessors, accessorsBChiquet
 @docs documented, annotated, importsAdd
 @docs implementation
@@ -22,7 +22,7 @@ module VariantPrism.GenerateUsed exposing
 
 ## name
 
-@docs VariantPrismNameConfig, prismNameVariant, prismNameOnVariant
+@docs VariantLensNameConfig, prismNameVariant, prismNameOnVariant
 
 -}
 
@@ -45,28 +45,28 @@ import Review.Project.Dependency as Dependency
 import Review.Rule as Rule exposing (Rule)
 import Set exposing (Set)
 import Stack
-import VariantPrism.GenerateUsed.Testable exposing (prismDeclarationToCodeGen)
+import VariantLens.GenerateUsed.Testable exposing (prismDeclarationToCodeGen)
 
 
 {-| Generate prisms for variant `type`s
 that are called from your code but aren't already defined in a dedicated `module`.
 
     import Review.Rule as Rule exposing (Rule)
-    import VariantPrism.GenerateUsed
+    import VariantLens.GenerateUsed
 
     config : List Rule
     config =
-        [ VariantPrism.GenerateUsed.rule ..config..
+        [ VariantLens.GenerateUsed.rule ..config..
         ]
 
 ..config.. How to generate, where to generate:
 
   - `build :`
-    a [`VariantPrismBuild` function](#VariantPrismBuild) like
+    a [`VariantLensBuild` function](#VariantLensBuild) like
       - [`accessors`](#accessors)
       - [`accessorsBChiquet`](#accessorsBChiquet)
   - `name :`
-    a way to handle variant prism names like
+    a way to handle variant lens names like
       - [`prismNameOnVariant`](#prismNameOnVariant)
       - [`prismNameVariant`](#prismNameVariant)
   - `generationModuleIsVariantModuleDotSuffix :`
@@ -78,16 +78,16 @@ because [`import` aliases can't contain `.`](https://github.com/elm/compiler/iss
 
 ### example `module Variant.Module.On exposing (some)`
 
-    { build = VariantPrism.GenerateUsed.accessors
-    , name = VariantPrism.GenerateUsed.prismNameVariant
+    { build = VariantLens.GenerateUsed.accessors
+    , name = VariantLens.GenerateUsed.prismNameVariant
     , generationModuleIsVariantModuleDotSuffix = "On"
     }
 
 
 ### example: `module Variant.Module.X exposing (onSome)`
 
-    { build = VariantPrism.GenerateUsed.accessors
-    , name = VariantPrism.GenerateUsed.prismNameOnVariant
+    { build = VariantLens.GenerateUsed.accessors
+    , name = VariantLens.GenerateUsed.prismNameOnVariant
     , generationModuleIsVariantModuleDotSuffix = "X"
     }
 
@@ -104,8 +104,8 @@ boilerplate related to updating potentially deeply nested data.
 
 -}
 rule :
-    { name : VariantPrismNameConfig
-    , build : VariantPrismBuild
+    { name : VariantLensNameConfig
+    , build : VariantLensBuild
     , generationModuleIsVariantModuleDotSuffix : String
     }
     -> Rule
@@ -131,8 +131,8 @@ rule config =
 
 type alias Config =
     RecordWithoutConstructorFunction
-        { name : VariantPrismNameConfig
-        , build : VariantPrismBuild
+        { name : VariantLensNameConfig
+        , build : VariantLensBuild
         , generationModuleSuffix : String
         }
 
@@ -306,12 +306,12 @@ implementation { variantName, variantValues } =
     }
 
 
-{-| [`VariantPrismBuild`](#VariantPrismBuild)
+{-| [`VariantLensBuild`](#VariantLensBuild)
 of named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/)
 which with
 
-    { build = VariantPrism.GenerateUsed.accessors
-    , name = VariantPrism.GenerateUsed.prismNameVariant
+    { build = VariantLens.GenerateUsed.accessors
+    , name = VariantLens.GenerateUsed.prismNameVariant
     , generationModuleIsVariantModuleDotSuffix = "On"
     }
 
@@ -330,7 +330,7 @@ generates
     import Accessors exposing (makeOneToN_)
     import Data exposing (Data(..))
 
-    {-| Accessor prism for the variant `Data.Some` of the `type Data`.
+    {-| Accessor lens for the variant `Data.Some` of the `type Data`.
     -}
     some :
         Relation ( a, ( b, ( c, d ) ) ) reachable wrap
@@ -360,7 +360,7 @@ generates
             )
 
 -}
-accessors : VariantPrismBuild
+accessors : VariantLensBuild
 accessors =
     \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
         { imports =
@@ -376,7 +376,7 @@ accessors =
         , documentation =
             CodeGen.emptyDocComment
                 |> CodeGen.markdown
-                    ([ "Accessor prism for the variant `"
+                    ([ "Accessor lens for the variant `"
                      , variantModule
                      , "."
                      , variantName
@@ -432,12 +432,12 @@ lensType structure transformed attribute built =
     CodeGen.typed "Lens" [ structure, transformed, attribute, built ]
 
 
-{-| [`VariantPrismBuild`](#VariantPrismBuild)
+{-| [`VariantLensBuild`](#VariantLensBuild)
 of named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/)
 which with
 
-    { build = VariantPrism.GenerateUsed.accessors
-    , name = VariantPrism.GenerateUsed.prismNameVariant
+    { build = VariantLens.GenerateUsed.accessors
+    , name = VariantLens.GenerateUsed.prismNameVariant
     , generationModuleIsVariantModuleDotSuffix = "On"
     }
 
@@ -456,7 +456,7 @@ generates
     import Accessors exposing (makeOneToN_)
     import Data exposing (Data(..))
 
-    {-| Accessor prism for the variant `Data.Some` of the `type Data`.
+    {-| Accessor lens for the variant `Data.Some` of the `type Data`.
     -}
     some :
         Relation ( a, ( b, ( c, d ) ) ) reachable wrap
@@ -485,7 +485,7 @@ generates
             )
 
 -}
-accessorsBChiquet : VariantPrismBuild
+accessorsBChiquet : VariantLensBuild
 accessorsBChiquet =
     \{ variantName, typeName, variantValues, typeParameters, variantModule } ->
         { imports =
@@ -501,7 +501,7 @@ accessorsBChiquet =
         , documentation =
             CodeGen.emptyDocComment
                 |> CodeGen.markdown
-                    ([ "Accessor prism for the variant `"
+                    ([ "Accessor lens for the variant `"
                      , variantModule
                      , "."
                      , variantName
@@ -556,14 +556,14 @@ typeRelation structure attribute wrap =
     CodeGen.typed "Relation" [ structure, attribute, wrap ]
 
 
-{-| How to derive prism name <=> variant name.
+{-| How to derive lens name <=> variant name.
 
 Out of the box, there are
 
   - [`prismNameOnVariant`](prismNameOnVariant)
   - [`prismNameVariant`](#prismNameVariant)
 
-You can also create a custom [`VariantPrismNameConfig`](#VariantPrismNameConfig):
+You can also create a custom [`VariantLensNameConfig`](#VariantLensNameConfig):
 
     import Parser
 
@@ -599,29 +599,29 @@ Don't worry about the case of the results.
 They will be automatically be corrected when passed to [`rule`](#rule).
 
 -}
-type alias VariantPrismNameConfig =
+type alias VariantLensNameConfig =
     RecordWithoutConstructorFunction
         { parser : Parser { variantName : String }
         , build : { variantName : String } -> String
         }
 
 
-{-| Handle prism names in the format `on<Variant>`.
-Check out [`VariantPrismNameConfig`](#VariantPrismNameConfig) for all naming options.
+{-| Handle lens names in the format `on<Variant>`.
+Check out [`VariantLensNameConfig`](#VariantLensNameConfig) for all naming options.
 
     import Parser
-    import VariantPrism.GenerateUsed
+    import VariantLens.GenerateUsed
 
     "onSuccess"
-        |> Parser.run VariantPrism.GenerateUsed.prismNameOnVariant.parser
+        |> Parser.run VariantLens.GenerateUsed.prismNameOnVariant.parser
     --> { variantName = "Success" }
 
     { variantName = "Success" }
-        |> VariantPrism.GenerateUsed.prismOnVariant.build
+        |> VariantLens.GenerateUsed.prismOnVariant.build
     --> "onSuccess"
 
 -}
-prismNameOnVariant : VariantPrismNameConfig
+prismNameOnVariant : VariantLensNameConfig
 prismNameOnVariant =
     { build = \{ variantName } -> "on" ++ variantName
     , parser =
@@ -633,22 +633,22 @@ prismNameOnVariant =
     }
 
 
-{-| Handle prism names in the format `on<Variant>`.
-Check out [`VariantPrismNameConfig`](#VariantPrismNameConfig) for all naming options.
+{-| Handle lens names in the format `on<Variant>`.
+Check out [`VariantLensNameConfig`](#VariantLensNameConfig) for all naming options.
 
     import Parser
-    import VariantPrism.GenerateUsed
+    import VariantLens.GenerateUsed
 
     "success"
-        |> Parser.run VariantPrism.GenerateUsed.prismNameOnVariant.parser
+        |> Parser.run VariantLens.GenerateUsed.prismNameOnVariant.parser
     --> { variantName = "Success" }
 
     { variantName = "Success" }
-        |> VariantPrism.GenerateUsed.prismOnVariant.build
+        |> VariantLens.GenerateUsed.prismOnVariant.build
     --> "success"
 
 -}
-prismNameVariant : VariantPrismNameConfig
+prismNameVariant : VariantLensNameConfig
 prismNameVariant =
     { build = \{ variantName } -> variantName |> char0ToLower
     , parser =
@@ -663,7 +663,7 @@ prismNameVariant =
 
 
 {-| [Configure](#Config)
-how to generate a variant prism declaration
+how to generate a variant lens declaration
 plus the necessary `import`s.
 
 Out of the box, there are
@@ -671,16 +671,16 @@ Out of the box, there are
   - [`accessors`](#accessors)
   - [`accessorsBChiquet`](#accessorsBChiquet)
 
-You can customize existing variant prism declarations with [`documented`](#documented) and [`annotated`](#annotated)
-or create a custom prism generator ([the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest), [`implementation`](#implementation) can be helpful).
+You can customize existing variant lens declarations with [`documented`](#documented) and [`annotated`](#annotated)
+or create a custom lens generator ([the-sett's elm-syntax-dsl](https://package.elm-lang.org/packages/the-sett/elm-syntax-dsl/latest), [`implementation`](#implementation) can be helpful).
 
-    customPrismGenerator : VariantPrismBuild
-    customPrismGenerator { variantName, typeName, typeParameters, variantValues } =
+    customLensGenerator : VariantLensBuild
+    customLensGenerator { variantName, typeName, typeParameters, variantValues } =
         { imports =
-            [ importStmt [ "CustomPrism" ]
-                Nothing
+            [ importStmt [ "CustomLens" ]
+                NothingLens
                 (exposeExplicit
-                    [ typeOrAliasExpose "CustomPrism" ]
+                    [ typeOrAliasExpose "CustomLens" ]
                     |> Just
                 )
                 |> Just
@@ -704,10 +704,10 @@ or create a custom prism generator ([the-sett's elm-syntax-dsl](https://package.
         , documentation =
             emptyDocComment
                 |> markdown
-                    ("`CustomPrism` for the variant `" ++ variantName ++ "`.")
+                    ("`CustomLens` for the variant `" ++ variantName ++ "`.")
                 |> Just
         , annotation =
-            typed "CustomPrism"
+            typed "CustomLens"
                 [ CodeGen.typed typeName
                     (typeParameters |> List.map CodeGen.typeVar)
                 , case variantValues of
@@ -738,11 +738,11 @@ or create a custom prism generator ([the-sett's elm-syntax-dsl](https://package.
                         , variantValues = variantValues
                         }
             in
-            fqConstruct [ "CustomPrism" ] "create" [ access, alter ]
+            fqConstruct [ "CustomLens" ] "create" [ access, alter ]
         }
 
 -}
-type alias VariantPrismBuild =
+type alias VariantLensBuild =
     { variantModule : String
     , typeName : String
     , typeParameters : List String
@@ -757,14 +757,14 @@ type alias VariantPrismBuild =
         }
 
 
-{-| [Build](#VariantPrismBuild) a different documentation:
+{-| [Build](#VariantLensBuild) a different documentation:
 
     accessorsDocumentedCustom info =
         accessors info
             |> documented
                 (emptyDocComment
                     |> markdown
-                        ("Accessor prism for the variant `" ++ info.variantName ++ "`.")
+                        ("Accessor lens for the variant `" ++ info.variantName ++ "`.")
                 )
 
 -}
@@ -785,13 +785,13 @@ documented docCommentReplacement =
         }
 
 
-{-| [Build](#VariantPrismBuild) a different type annotation:
+{-| [Build](#VariantLensBuild) a different type annotation:
 
-    accessorsAnnotatedPrism : VariantPrismBuild
-    accessorsAnnotatedPrism info =
+    accessorsAnnotatedLens : VariantLensBuild
+    accessorsAnnotatedLens info =
         accessors info
             |> annotated
-                (typed "Prism"
+                (typed "Lens"
                     [ CodeGen.typed info.typeName
                         (info.typeParameters |> List.map CodeGen.typeVar)
                     , case variantValues of
@@ -809,7 +809,7 @@ documented docCommentReplacement =
             |> importsAdd
                 [ impostStmt [ "Accessors" ]
                     Nothing
-                    ([ "Prism" |> typeOrAliasExpose ] |> exposingExplicit |> Just)
+                    ([ "Lens" |> typeOrAliasExpose ] |> exposingExplicit |> Just)
                 ]
 
 Make sure to [`importsAdd`](#importsAdd).
@@ -834,14 +834,14 @@ annotated annotationReplacement =
 
 {-| Supply additional `import`s required for generating the declaration.
 
-    accessorsAnnotatedPrism : VariantPrismBuild
-    accessorsAnnotatedPrism info =
+    accessorsAnnotatedLens : VariantLensBuild
+    accessorsAnnotatedLens info =
         accessors info
-            |> annotated (typed "Prism" [ ... ])
+            |> annotated (typed "Lens" [ ... ])
             |> importsAdd
                 [ impostStmt [ "Accessors" ]
                     Nothing
-                    ([ "Prism" |> typeOrAliasExpose ] |> exposingExplicit |> Just)
+                    ([ "Lens" |> typeOrAliasExpose ] |> exposingExplicit |> Just)
                 ]
 
 -}
@@ -863,7 +863,7 @@ importsAdd importsAdditional =
 ruleImplementation : Config -> Rule
 ruleImplementation config =
     Rule.newProjectRuleSchema
-        "NoMissingVariantPrism"
+        "VariantLens.GenerateUsed"
         initialProjectContext
         |> Rule.withDependenciesProjectVisitor
             (\dependencies context ->
@@ -906,7 +906,11 @@ ruleImplementation config =
                     |> Rule.withDeclarationEnterVisitor
                         (\(Node _ declaration) context ->
                             ( []
-                            , context |> declarationVisit declaration
+                            , context
+                                |> declarationVisit
+                                    { lensNameParser = config.name.parser
+                                    , declaration = declaration
+                                    }
                             )
                         )
             )
@@ -1002,7 +1006,10 @@ type alias PossibleUseModuleContext =
 type alias GenerationModuleContext =
     RecordWithoutConstructorFunction
         { variantModule : String
-        , available : Set String
+        , available :
+            Set
+                -- variant name
+                String
         , exposing_ : Node Exposing
         , -- the location to insert possible declarations first, then `import`s
           belowImportsRow : Int
@@ -1283,13 +1290,21 @@ possibleUseModuleExpressionVisit { nameParser, expressionNode, generationModuleS
             identity
 
 
-declarationVisit : Declaration -> ModuleContext -> ModuleContext
-declarationVisit declaration =
+declarationVisit :
+    { lensNameParser : Parser { variantName : String }
+    , declaration : Declaration
+    }
+    -> ModuleContext
+    -> ModuleContext
+declarationVisit { lensNameParser, declaration } =
     \context ->
         case context of
             GenerationModuleContext generationModuleContext ->
                 generationModuleContext
-                    |> generationModuleDeclarationVisit declaration
+                    |> generationModuleDeclarationVisit
+                        { lensNameParser = lensNameParser
+                        , declaration = declaration
+                        }
                     |> GenerationModuleContext
 
             PossibleUseModuleContext possibleUseModuleContext ->
@@ -1299,26 +1314,35 @@ declarationVisit declaration =
 
 
 generationModuleDeclarationVisit :
-    Declaration
+    { lensNameParser : Parser { variantName : String }
+    , declaration : Declaration
+    }
     -> GenerationModuleContext
     -> GenerationModuleContext
-generationModuleDeclarationVisit declaration =
-    \generationModuleContext ->
-        case declaration of
-            Declaration.FunctionDeclaration functionDeclaration ->
-                { generationModuleContext
-                    | available =
-                        generationModuleContext.available
-                            |> Set.insert
-                                (functionDeclaration.declaration
-                                    |> Node.value
-                                    |> .name
-                                    |> Node.value
-                                )
-                }
+generationModuleDeclarationVisit { lensNameParser, declaration } =
+    case declaration of
+        Declaration.FunctionDeclaration functionDeclaration ->
+            let
+                name =
+                    functionDeclaration.declaration
+                        |> Node.value
+                        |> .name
+                        |> Node.value
+            in
+            case name |> Parser.run lensNameParser of
+                Err _ ->
+                    identity
 
-            _ ->
-                generationModuleContext
+                Ok { variantName } ->
+                    \generationModuleContext ->
+                        { generationModuleContext
+                            | available =
+                                generationModuleContext.available
+                                    |> Set.insert variantName
+                        }
+
+        _ ->
+            identity
 
 
 possibleUseModuleDeclarationVisit :
@@ -1433,7 +1457,7 @@ generateForModule { usedVariantOriginModule, variantModuleName, maybeGenerationM
         Nothing ->
             [ Rule.errorForModule useModuleKey
                 { message =
-                    [ "variant prism generation `module ", generationModuleName, "` missing" ]
+                    [ "variant lens generation `module ", generationModuleName, "` missing" ]
                         |> String.concat
                 , details =
                     [ "Create such an elm file where variant prisms will be generated in."
@@ -1458,7 +1482,7 @@ generateForModule { usedVariantOriginModule, variantModuleName, maybeGenerationM
                         useModuleKey
                         { message = [ "`", importString, "` missing" ] |> String.concat
                         , details =
-                            [ "Add the variant prism generation `module` `import` through the supplied fix."
+                            [ "Add the variant lens generation `module` `import` through the supplied fix."
                             ]
                         }
                         firstUseRange
@@ -1499,11 +1523,11 @@ generateForModule { usedVariantOriginModule, variantModuleName, maybeGenerationM
                                     Rule.errorForModuleWithFix
                                         generationModule.key
                                         { message =
-                                            [ "variant prism on `", variantModuleName, ".", variantName, "` missing" ]
+                                            [ "variant lens on `", variantModuleName, ".", variantName, "` missing" ]
                                                 |> String.concat
                                         , details =
-                                            [ "A variant prism with this name is used in other `module`s."
-                                            , "Add the generated prism declaration through the fix."
+                                            [ "A variant lens with this name is used in other `module`s."
+                                            , "Add the generated lens declaration through the fix."
                                             ]
                                         }
                                         (generationModule.exposing_ |> Node.range)
