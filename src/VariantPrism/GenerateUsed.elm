@@ -1,8 +1,5 @@
 module VariantPrism.GenerateUsed exposing
     ( rule
-    , Config(..)
-    , inVariantOriginModuleDotSuffix
-    , GenerationModuleImportAlias, importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleAsOriginModule, importGenerationModuleWithoutAlias
     , VariantPrismBuild
     , accessors, accessorsBChiquet
     , documented, annotated, importsAdd
@@ -13,13 +10,6 @@ module VariantPrism.GenerateUsed exposing
 {-|
 
 @docs rule
-
-
-# config
-
-@docs Config
-@docs inVariantOriginModuleDotSuffix
-@docs GenerationModuleImportAlias, importGenerationModuleAsOriginModuleWithSuffix, importGenerationModuleAsOriginModule, importGenerationModuleWithoutAlias
 
 
 ## build
@@ -66,16 +56,40 @@ that are called from your code but aren't already defined in a dedicated `module
 
     config : List Rule
     config =
-        [ { name = VariantPrism.GenerateUsed.prismNameOnVariant
-          , build = VariantPrism.GenerateUsed.accessors
-          }
-            |> VariantPrism.inVariantOriginModuleDotSuffix
-                "Extra.Local"
-            |> VariantPrism.importGenerationModuleAsOriginModule
-            |> VariantPrism.GenerateUsed.rule
+        [ VariantPrism.GenerateUsed.rule ..config..
         ]
 
-**Check out [`Config`](#Config)!**
+..config.. How to generate, where to generate:
+
+  - `build :`
+    a [`VariantPrismBuild` function](#VariantPrismBuild) like
+      - [`accessors`](#accessors)
+      - [`accessorsBChiquet`](#accessorsBChiquet)
+  - `name :`
+    a way to handle variant prism names like
+      - [`prismNameOnVariant`](#prismNameOnVariant)
+      - [`prismNameVariant`](#prismNameVariant)
+  - `generationModuleIsVariantModuleDotSuffix :`
+    a `.Suffix` to derive generation `module` names from variant `module` names
+
+There's no configuration to automatically `import Variant.Module.Generation as Variant.Module`
+because [`import` aliases can't contain `.`](https://github.com/elm/compiler/issues/2260)
+
+
+### example `module Variant.Module.On exposing (some)`
+
+    { build = VariantPrism.GenerateUsed.accessors
+    , name = VariantPrism.GenerateUsed.prismNameVariant
+    , generationModuleIsVariantModuleDotSuffix = "On"
+    }
+
+
+### example: `module Variant.Module.X exposing (onSome)`
+
+    { build = VariantPrism.GenerateUsed.accessors
+    , name = VariantPrism.GenerateUsed.prismNameOnVariant
+    , generationModuleIsVariantModuleDotSuffix = "X"
+    }
 
 
 ## use it
@@ -89,180 +103,30 @@ boilerplate related to updating potentially deeply nested data.
 ... when you consider lenses the less readable/intuitive/simple/explicit alternative.
 
 -}
-rule : Config -> Rule
+rule :
+    { name : VariantPrismNameConfig
+    , build : VariantPrismBuild
+    , generationModuleIsVariantModuleDotSuffix : String
+    }
+    -> Rule
 rule config =
-    ruleImplementation config
+    ruleImplementation
+        { build = config.build
+        , name = config.name
+        , generationModuleSuffix = config.generationModuleIsVariantModuleDotSuffix
+        }
 
 
 
 -- config
 
 
-{-| How to generate, where to generate, how to `import`.
-
-Start with
-
-  - `name :` a [`VariantPrismBuild` function](#VariantPrismBuild) like [`accessors`](#accessors)
-  - `build :` a way to handle variant prism names like [`prismNameOnVariant`](#prismNameOnVariant)
-
-```
-{ name = VariantPrism.GenerateUsed.prismNameOnVariant
-, build = VariantPrism.GenerateUsed.accessors
-}
-    |> VariantPrism.inVariantOriginModuleDotSuffix
-        "Extra.Local"
-    |> VariantPrism.importGenerationModuleAsOriginModule
-    |> VariantPrism.GenerateUsed.rule
-```
-
-  - [`inVariantOriginModuleDotSuffix "Extra.Local"`](#inVariantOriginModuleDotSuffix)
-    → prisms are generated in the `module YourVariantOriginModule.Extra.Local`
-  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModuleWithSuffix)
-    → automatic `import`s of the generation `module` `as YourVariantOriginModule`
-
-Choose what you like best:
-
-  - `import RemoteData.Variant.Generated as RemoteDataVariant`, then `RemoteDataVariant.onSuccess`?
-
-        inVariantOriginModuleDotSuffix "Variant.Generated"
-            |> importGenerationModuleAsOriginModuleWithSuffix "Variant"
-
-  - `RemoteData.Generated.onSuccess`?
-
-        inVariantOriginModuleDotSuffix "Generated"
-
-  - ...
-
--}
-type Config
-    = Config
+type alias Config =
+    RecordWithoutConstructorFunction
         { name : VariantPrismNameConfig
         , build : VariantPrismBuild
         , generationModuleSuffix : String
-        , generationModuleImportAlias : Maybe GenerationModuleImportAlias
         }
-
-
-{-| Configuration for a generation `module` `import` alias. Use
-
-  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModule)
-  - [`importGenerationModuleAsOriginModuleWithSuffix`](#importGenerationModuleAsOriginModuleWithSuffix)
-
--}
-type GenerationModuleImportAlias
-    = OriginModule
-    | OriginModuleWithSuffix String
-
-
-{-| Generation `module`s are derived from variant origin `module`s using the configured `.Suffix`.
-
-for
-
-    module Data exposing (Data(..))
-
-with
-
-    inVariantOriginModuleDotSuffix "Extra.Local"
-
-the generation `module` is named
-
-    module Data.Extra.Local exposing (onSome)
-
-You can optionally configure aliases when `import`ing generation `module`s automatically using
-
-  - [`importGenerationModuleAsOriginModule`](#importGenerationModuleAsOriginModule)
-  - [`importGenerationModuleAsOriginModuleWithSuffix`](#importGenerationModuleAsOriginModuleWithSuffix)
-
--}
-inVariantOriginModuleDotSuffix :
-    String
-    ->
-        { name : VariantPrismNameConfig
-        , build : VariantPrismBuild
-        }
-    -> Config
-inVariantOriginModuleDotSuffix generationModuleSuffix =
-    \variantPrismConfig ->
-        { name =
-            { parser =
-                variantPrismConfig.name.parser
-                    |> Parser.map
-                        (\{ variantName } ->
-                            { variantName = variantName |> char0ToUpper }
-                        )
-            , build =
-                \variantName ->
-                    variantName
-                        |> variantPrismConfig.name.build
-                        |> char0ToLower
-            }
-        , build = variantPrismConfig.build
-        , generationModuleSuffix = generationModuleSuffix
-        , generationModuleImportAlias = Nothing
-        }
-            |> Config
-
-
-{-| When using a variant prism
-
-    DataX.onVariant
-
-To generate an automatic `import`
-
-    import Data.Extra.Local as DataX
-
-use
-
-    importGenerationModuleAsOriginModuleWithSuffix "X"
-
-Remember that elm doesn't [allow `.`s in `import` aliases](https://github.com/elm/compiler/issues/2260).
-
--}
-importGenerationModuleAsOriginModuleWithSuffix : String -> Config -> Config
-importGenerationModuleAsOriginModuleWithSuffix generationModuleImportAliasSuffixForOriginModule =
-    \(Config config) ->
-        { config
-            | generationModuleImportAlias =
-                OriginModuleWithSuffix generationModuleImportAliasSuffixForOriginModule
-                    |> Just
-        }
-            |> Config
-
-
-{-| When using a variant prism
-
-    Data.onVariant
-
-To generate an automatic `import`
-
-    import Data.Extra.Local as Data
-
-use
-
-    importGenerationModuleAsOriginModule
-
-Remember that elm doesn't allow `.`s in `import` aliases.
-
--}
-importGenerationModuleAsOriginModule : Config -> Config
-importGenerationModuleAsOriginModule =
-    \(Config config) ->
-        { config
-            | generationModuleImportAlias =
-                OriginModule |> Just
-        }
-            |> Config
-
-
-{-| Drop potential configured aliases when `import`ing the generation `module` automatically.
--}
-importGenerationModuleWithoutAlias : Config -> Config
-importGenerationModuleWithoutAlias =
-    \(Config config) ->
-        { config
-            | generationModuleImportAlias = Nothing
-        }
-            |> Config
 
 
 {-| Helpers for values of a given variant in the form
@@ -440,11 +304,9 @@ of named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/
 which with
 
     { build = VariantPrism.GenerateUsed.accessors
-    , name = VariantPrism.GenerateUsed.prismNameOnVariant
+    , name = VariantPrism.GenerateUsed.prismNameVariant
+    , generationModuleIsVariantModuleDotSuffix = "On"
     }
-        |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
-            "Extra.Local"
-        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
 
 and
 
@@ -456,17 +318,17 @@ and
 
 generates
 
-    module Data.Extra.Local exposing (onSome)
+    module Data.On exposing (some)
 
     import Accessors exposing (makeOneToN_)
     import Data exposing (Data(..))
 
     {-| Accessor prism for the variant `Some` of the `type Data`.
     -}
-    onSome :
+    some :
         Relation ( a, ( b, ( c, d ) ) ) reachable wrap
         -> Relation (Data a b c d) reachable (Maybe wrap)
-    onSome =
+    some =
         makeOneToN_
             "Data.Some"
             (\valuesAlter variantType ->
@@ -558,12 +420,10 @@ accessors =
 of named [erlandsona/elm-accessors](https://dark.elm.dmy.fr/packages/erlandsona/elm-accessors/latest/)
 which with
 
-    VariantPrism.GenerateUsed.accessors
-        |> VariantPrism.GenerateUsed.withName
-            VariantPrism.GenerateUsed.prismNameOnVariant
-        |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
-            "Extra.Local"
-        |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
+    { build = VariantPrism.GenerateUsed.accessors
+    , name = VariantPrism.GenerateUsed.prismNameVariant
+    , generationModuleIsVariantModuleDotSuffix = "On"
+    }
 
 and
 
@@ -575,17 +435,17 @@ and
 
 generates
 
-    module Data.Extra.Local exposing (onSome)
+    module Data.On exposing (some)
 
     import Accessors exposing (makeOneToN_)
     import Data exposing (Data(..))
 
     {-| Accessor prism for the variant `Some` of the `type Data`.
     -}
-    onSome :
+    some :
         Relation ( a, ( b, ( c, d ) ) ) reachable wrap
         -> Relation (Data a b c d) reachable (Maybe wrap)
-    onSome =
+    some =
         makeOneToN
             (\valuesAlter variantType ->
                 case variantType of
@@ -983,10 +843,6 @@ importsAdd importsAdditional =
 
 ruleImplementation : Config -> Rule
 ruleImplementation config =
-    let
-        (Config configuration) =
-            config
-    in
     Rule.newProjectRuleSchema
         "NoMissingVariantPrism"
         initialProjectContext
@@ -1022,11 +878,8 @@ ruleImplementation config =
                             ( []
                             , context
                                 |> expressionVisit
-                                    { nameParser = configuration.name.parser
-                                    , generationModuleSuffix =
-                                        configuration.generationModuleSuffix
-                                    , maybeGenerationModuleImportAlias =
-                                        configuration.generationModuleImportAlias
+                                    { nameParser = config.name.parser
+                                    , generationModuleSuffix = config.generationModuleSuffix
                                     , expressionNode = expressionNode
                                     }
                             )
@@ -1041,10 +894,12 @@ ruleImplementation config =
         |> Rule.withModuleContextUsingContextCreator
             { fromProjectToModule =
                 projectContextToModule
-                    { generationModuleSuffix = configuration.generationModuleSuffix }
+                    { generationModuleSuffix = config.generationModuleSuffix
+                    }
             , fromModuleToProject =
                 moduleContextToProject
-                    { generationModuleSuffix = configuration.generationModuleSuffix }
+                    { generationModuleSuffix = config.generationModuleSuffix
+                    }
             , foldProjectContexts = projectContextsFold
             }
         |> Rule.withFinalProjectEvaluation
@@ -1297,12 +1152,11 @@ importVisit importNode =
 expressionVisit :
     { nameParser : Parser { variantName : String }
     , generationModuleSuffix : String
-    , maybeGenerationModuleImportAlias : Maybe GenerationModuleImportAlias
     , expressionNode : Node Expression
     }
     -> ModuleContext
     -> ModuleContext
-expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGenerationModuleImportAlias } =
+expressionVisit { nameParser, expressionNode, generationModuleSuffix } =
     \context ->
         case context of
             GenerationModuleContext generationModuleContext ->
@@ -1326,33 +1180,12 @@ expressionVisit { nameParser, expressionNode, generationModuleSuffix, maybeGener
                                             functionOrValueRange
                                             |> Maybe.withDefault qualificationSyntax
                                             |> qualifiedSyntaxToString
-
-                                    maybeGenerationModuleOriginModule =
-                                        case possibleGenerationModule |> Parser.run (beforeSuffixParser ("." ++ generationModuleSuffix)) of
-                                            Ok originModule_ ->
-                                                originModule_ |> Just
-
-                                            Err _ ->
-                                                case maybeGenerationModuleImportAlias of
-                                                    Nothing ->
-                                                        Nothing
-
-                                                    Just OriginModule ->
-                                                        possibleGenerationModule |> Just
-
-                                                    Just (OriginModuleWithSuffix importAliasSuffix) ->
-                                                        case possibleGenerationModule |> Parser.run (beforeSuffixParser importAliasSuffix) of
-                                                            Err _ ->
-                                                                Nothing
-
-                                                            Ok originModule_ ->
-                                                                originModule_ |> Just
                                 in
-                                case maybeGenerationModuleOriginModule of
-                                    Nothing ->
+                                case possibleGenerationModule |> Parser.run (beforeSuffixParser ("." ++ generationModuleSuffix)) of
+                                    Err _ ->
                                         possibleUseModuleContext
 
-                                    Just originModule_ ->
+                                    Ok originModule_ ->
                                         { possibleUseModuleContext
                                             | uses =
                                                 possibleUseModuleContext.uses
@@ -1532,9 +1365,6 @@ generateForModule :
     -> List (Rule.Error errorScope_)
 generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGenerationModule, useModuleBelowImportsColumn, config, variantTypes, useModuleKey } =
     let
-        (Config configuration) =
-            config
-
         firstUseRange =
             usedVariantOriginModule.variantsOfUses
                 |> Dict.values
@@ -1543,7 +1373,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                 |> Maybe.withDefault Range.emptyRange
 
         generationModuleName =
-            [ variantOriginModuleName, ".", configuration.generationModuleSuffix ]
+            [ variantOriginModuleName, ".", config.generationModuleSuffix ]
                 |> String.concat
     in
     case maybeGenerationModule of
@@ -1565,21 +1395,8 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
 
                 Missing ->
                     [ let
-                        generationModuleAlias =
-                            configuration.generationModuleImportAlias
-                                |> Maybe.map
-                                    (\alias_ ->
-                                        [ case alias_ of
-                                            OriginModule ->
-                                                variantOriginModuleName
-
-                                            OriginModuleWithSuffix aliasSuffix ->
-                                                variantOriginModuleName ++ aliasSuffix
-                                        ]
-                                    )
-
                         importString =
-                            [ CodeGen.importStmt [ generationModuleName ] generationModuleAlias Nothing ]
+                            [ CodeGen.importStmt [ generationModuleName ] Nothing Nothing ]
                                 |> importsToString
                       in
                       Rule.errorForModuleWithFix
@@ -1615,7 +1432,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                                 (\( variantName, variantValues ) ->
                                     let
                                         built =
-                                            configuration.build
+                                            config.build
                                                 { variantModule = variantOriginModuleName
                                                 , typeName = variantTypeName
                                                 , typeParameters = variantType.parameters
@@ -1637,7 +1454,7 @@ generateForModule { usedVariantOriginModule, variantOriginModuleName, maybeGener
                                         [ Fix.insertAt
                                             (generationModule.belowImportsColumn |> onRow 1)
                                             ([ "\n\n"
-                                             , { name = configuration.name.build { variantName = variantName }
+                                             , { name = config.name.build { variantName = variantName }
                                                , documentation = built.documentation
                                                , annotation = built.annotation
                                                , implementation = built.implementation

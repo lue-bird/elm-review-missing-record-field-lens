@@ -32,9 +32,9 @@ build =
 
 
 -}
-onSome :
+some :
     Relation ( ( ( a, b ), c ), d ) reachable wrap -> Relation (Data a b c d) reachable (Maybe wrap)
-onSome =
+some =
     makeOneToN_
         "Data.Some"
         (\\variantValuesAlter variantType ->
@@ -70,9 +70,9 @@ onSome =
 
 
 -}
-onSome :
+some :
     Relation ( ( ( a, b ), c ), d ) reachable wrap -> Relation (Data a b c d) reachable (Maybe wrap)
-onSome =
+some =
     makeOneToN
         (\\variantValuesAlter variantType ->
             case variantType of
@@ -107,11 +107,11 @@ generates =
         [ test
             "multiple variant values, generation module exposing (..)"
             (\() ->
-                [ """module Data.Extra.Local exposing (..)
+                [ """module Data.On exposing (..)
 """
                 , """module Use exposing (use)
 
-use = Data.onSome
+use = Data.On.some
 
 """
                 , """module Data exposing (Data(..))
@@ -122,33 +122,31 @@ type Data a b c d
 """
                 ]
                     |> Review.Test.runOnModules
-                        ({ name = VariantPrism.GenerateUsed.prismNameOnVariant
-                         , build = VariantPrism.GenerateUsed.accessors
-                         }
-                            |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
-                                "Extra.Local"
-                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
-                            |> VariantPrism.GenerateUsed.rule
+                        (VariantPrism.GenerateUsed.rule
+                            { build = VariantPrism.GenerateUsed.accessors
+                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                            , generationModuleIsVariantModuleDotSuffix = "On"
+                            }
                         )
                     |> Review.Test.expectErrorsForModules
                         [ ( "Use"
                           , [ Review.Test.error
-                                { message = "`import Data.Extra.Local as Data` missing"
+                                { message = "`import Data.On` missing"
                                 , details =
                                     [ "Add the variant prism generation `module` `import` through the supplied fix" ]
-                                , under = "Data.onSome"
+                                , under = "Data.On.some"
                                 }
                                 |> Review.Test.whenFixed
                                     """module Use exposing (use)
 
-import Data.Extra.Local as Data
-use = Data.onSome
+import Data.On
+use = Data.On.some
 
 """
                             ]
                           )
 
-                        {- , ( "Data.Extra.Local"
+                        {- , ( "Data.On"
                                                      , [ Review.Test.error
                                                            { message = "prism for variant `Some` missing"
                                                            , details =
@@ -158,7 +156,7 @@ use = Data.onSome
                                                            , under = "(..)"
                                                            }
                                                            |> Review.Test.whenFixed
-                                                               """module Data.Extra.Local exposing (some)
+                                                               """module Data.On exposing (some)
 
                            import Accessors exposing (makeOneToN_)
                            import Data exposing (Data(..))
@@ -209,17 +207,15 @@ type One
 """
                 , """module Use exposing (use)
 
-use = Data.onOne
+use = Data.On.one
 """
                 ]
                     |> Review.Test.runOnModules
-                        ({ name = VariantPrism.GenerateUsed.prismNameOnVariant
-                         , build = VariantPrism.GenerateUsed.accessors
-                         }
-                            |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
-                                "Extra.Local"
-                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
-                            |> VariantPrism.GenerateUsed.rule
+                        (VariantPrism.GenerateUsed.rule
+                            { build = VariantPrism.GenerateUsed.accessors
+                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                            , generationModuleIsVariantModuleDotSuffix = "On"
+                            }
                         )
                     |> Review.Test.expectNoErrors
             )
@@ -236,17 +232,15 @@ variantDontError = ()
 """
                 , """module Use exposing (use)
 
-use = Data.onOne
+use = Data.On.one
 """
                 ]
                     |> Review.Test.runOnModules
-                        ({ name = VariantPrism.GenerateUsed.prismNameOnVariant
-                         , build = VariantPrism.GenerateUsed.accessors
-                         }
-                            |> VariantPrism.GenerateUsed.inVariantOriginModuleDotSuffix
-                                "Extra.Local"
-                            |> VariantPrism.GenerateUsed.importGenerationModuleAsOriginModule
-                            |> VariantPrism.GenerateUsed.rule
+                        (VariantPrism.GenerateUsed.rule
+                            { build = VariantPrism.GenerateUsed.accessors
+                            , name = VariantPrism.GenerateUsed.prismNameVariant
+                            , generationModuleIsVariantModuleDotSuffix = "On"
+                            }
                         )
                     |> Review.Test.expectNoErrors
             )
@@ -264,7 +258,7 @@ declarationBuildTestString declarationBuild =
                 , variantName = "Some"
                 }
     in
-    { name = VariantPrism.GenerateUsed.prismNameOnVariant.build { variantName = "Some" }
+    { name = VariantPrism.GenerateUsed.prismNameVariant.build { variantName = "Some" }
     , documentation = built.documentation
     , annotation = built.annotation
     , implementation = built.implementation
