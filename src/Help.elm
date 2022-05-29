@@ -215,7 +215,7 @@ typeRelation structure attribute wrap =
     CodeGen.typed "Relation" [ structure, attribute, wrap ]
 
 
-{-| <https://package.elm-lang.org/packages/erlandsona/elm-accessors/2.1.0/Accessors#Lens>
+{-| <https://package.elm-lang.org/packages/erlandsona/elm-accessors/latest/Accessors#Lens>
 -}
 typeLens :
     CodeGen.TypeAnnotation
