@@ -509,90 +509,29 @@ for
     { value0 = a, value1 = b, value2 = c, value3 = d }
 
 -}
-valuesRecord :
-    { variantValues : List CodeGen.TypeAnnotation
-    , variantName : String
-    }
-    ->
-        { value : CodeGen.Expression
-        , alter : CodeGen.Expression
-        , typeValues : CodeGen.TypeAnnotation
-        }
-valuesRecord { variantValues, variantName } =
-    { value =
-        case variantValues of
-            [] ->
-                CodeGen.unit
+valuesRecord : ValuesRepresent
+valuesRecord variant =
+    let
+        inOne valueName =
+            case variant.values of
+                [] ->
+                    CodeGen.unit
 
-            [ _ ] ->
-                CodeGen.val ("value" |> indexed 0)
+                [ _ ] ->
+                    CodeGen.val (valueName |> indexed 0)
 
-            value0 :: value1 :: valuesFrom2 ->
-                (value0 :: value1 :: valuesFrom2)
-                    |> List.indexedMap
-                        (\index _ ->
-                            ( "value" |> indexed index
-                            , CodeGen.val ("value" |> indexed index)
-                            )
-                        )
-                    |> CodeGen.record
-    , alter =
-        case variantValues of
-            [] ->
-                CodeGen.letExpr
-                    [ CodeGen.letDestructuring
-                        CodeGen.unitPattern
-                        (CodeGen.applyBinOp
-                            CodeGen.unit
-                            CodeGen.piper
-                            (CodeGen.fun "variantValuesAlter")
-                        )
-                    ]
-                    (CodeGen.val variantName)
-
-            [ _ ] ->
-                CodeGen.binOpChain
-                    (CodeGen.val ("value" |> indexed 0))
-                    CodeGen.piper
-                    [ CodeGen.fun "variantValuesAlter"
-                    , CodeGen.fun variantName
-                    ]
-
-            -- >= 2
-            value0 :: value1 :: values2Up ->
-                let
-                    variantValuesList =
-                        value0 :: value1 :: values2Up
-                in
-                CodeGen.letExpr
-                    [ CodeGen.letDestructuring
-                        (CodeGen.varPattern "altered")
-                        (CodeGen.applyBinOp
-                            (variantValuesList
-                                |> List.indexedMap
-                                    (\index _ ->
-                                        ( "value" |> indexed index
-                                        , CodeGen.val ("value" |> indexed index)
-                                        )
-                                    )
-                                |> CodeGen.record
-                            )
-                            CodeGen.piper
-                            (CodeGen.fun "variantValuesAlter")
-                        )
-                    ]
-                    (CodeGen.construct variantName
-                        (variantValuesList
-                            |> List.indexedMap
-                                (\index _ ->
-                                    CodeGen.access
-                                        (CodeGen.val "altered")
-                                        ("value" |> indexed index)
+                value0 :: value1 :: valuesFrom2 ->
+                    (value0 :: value1 :: valuesFrom2)
+                        |> List.indexedMap
+                            (\index _ ->
+                                ( valueName |> indexed index
+                                , CodeGen.val (valueName |> indexed index)
                                 )
-                        )
-                    )
-    , typeValues =
-        case variantValues of
+                            )
+                        |> CodeGen.record
+    in
+    { typeInOne =
+        case variant.values of
             [] ->
                 CodeGen.unitAnn
 
@@ -606,6 +545,66 @@ valuesRecord { variantValues, variantName } =
                             ( "value" |> indexed index, value )
                         )
                     |> CodeGen.recordAnn
+    , patternInOne =
+        case variant.values of
+            [] ->
+                \_ -> CodeGen.unitPattern
+
+            -- >= 2
+            value0 :: values1Up ->
+                \valueName ->
+                    (value0 :: values1Up)
+                        |> List.indexedMap
+                            (\index _ -> valueName |> indexed index)
+                        |> CodeGen.recordPattern
+    , inOne = inOne
+    , alter =
+        case variant.values of
+            [] ->
+                CodeGen.letExpr
+                    [ CodeGen.letDestructuring
+                        CodeGen.unitPattern
+                        (CodeGen.applyBinOp
+                            CodeGen.unit
+                            CodeGen.piper
+                            (CodeGen.fun "variantValuesAlter")
+                        )
+                    ]
+                    (CodeGen.val variant.name)
+
+            [ _ ] ->
+                CodeGen.binOpChain
+                    (CodeGen.val ("value" |> indexed 0))
+                    CodeGen.piper
+                    [ CodeGen.fun "variantValuesAlter"
+                    , CodeGen.fun variant.name
+                    ]
+
+            -- >= 2
+            value0 :: value1 :: values2Up ->
+                let
+                    variantValuesList =
+                        value0 :: value1 :: values2Up
+                in
+                CodeGen.letExpr
+                    [ CodeGen.letDestructuring
+                        (CodeGen.varPattern "altered")
+                        (CodeGen.applyBinOp
+                            (inOne "value")
+                            CodeGen.piper
+                            (CodeGen.fun "variantValuesAlter")
+                        )
+                    ]
+                    (CodeGen.construct variant.name
+                        (variantValuesList
+                            |> List.indexedMap
+                                (\index _ ->
+                                    CodeGen.access
+                                        (CodeGen.val "altered")
+                                        ("value" |> indexed index)
+                                )
+                        )
+                    )
     }
 
 
