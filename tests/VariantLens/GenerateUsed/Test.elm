@@ -20,92 +20,7 @@ build =
     Test.describe
         "build"
         [ buildAccessors
-        , Test.describe
-            "accessorsBChiquet"
-            [ Test.describe
-                "tupleNest"
-                [ Test.describe
-                    "variants >= 2"
-                    [ test
-                        "values >= 2"
-                        (\() ->
-                            [ """module Data exposing (Data(..))
-
-type Data a b c d
-    = Some a b c d
-    | None
-"""
-                            , """module Data.On exposing (..)
-"""
-                            , """module Use exposing (use)
-
-import Data.On
-
-
-use =
-    Data.On.some
-"""
-                            ]
-                                |> Review.Test.runOnModules
-                                    (VariantLens.GenerateUsed.rule
-                                        { build =
-                                            VariantLens.GenerateUsed.accessorsBChiquet
-                                                { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                                        , name = VariantLens.GenerateUsed.prismNameVariant
-                                        , generationModuleIsVariantModuleDotSuffix = "On"
-                                        }
-                                    )
-                                |> Review.Test.expectErrorsForModules
-                                    [ ( "Data.On"
-                                      , [ Review.Test.error
-                                            { message = "variant lens on `Data.Some` missing"
-                                            , details =
-                                                [ "A variant lens with this name is used in other `module`s."
-                                                , "Add the generated lens declaration through the fix."
-                                                ]
-                                            , under = "exposing (..)"
-                                            }
-                                            |> Review.Test.whenFixed
-                                                """module Data.On exposing (some)
-
-import Accessors exposing (Relation, makeOneToN, makeOneToOne)
-import Data exposing (Data(..))
-
-{-| Accessor lens for the variant `Data.Some` of the `type Data`.
-
-
--}
-some :
-    Relation ( a, ( b, ( c, d ) ) ) reachable wrap -> Relation (Data a b c d) reachable (Maybe wrap)
-some =
-    makeOneToN
-        (\\variantValuesAlter variantType ->
-            case variantType of
-                Some value0 value1 value2 value3 ->
-                    ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter |> Just
-
-                _ ->
-                    Nothing
-        )
-        (\\variantValuesAlter variantType ->
-            case variantType of
-                Some value0 value1 value2 value3 ->
-                    let
-                        ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                            ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
-                    in
-                    Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
-
-                other ->
-                    other
-        )"""
-                                        ]
-                                      )
-                                    ]
-                        )
-                    ]
-                ]
-            ]
+        , buildAccessorsBChiquet
         ]
 
 
@@ -718,6 +633,87 @@ some =
                 ]
             ]
         ]
+
+
+buildAccessorsBChiquet : Test
+buildAccessorsBChiquet =
+    test
+        "accessorsBChiquet, tupleNest, variants >= 2, values >= 2"
+        (\() ->
+            [ """module Data exposing (Data(..))
+
+type Data a b c d
+    = Some a b c d
+    | None
+"""
+            , """module Data.On exposing (..)
+"""
+            , """module Use exposing (use)
+
+import Data.On
+
+
+use =
+    Data.On.some
+"""
+            ]
+                |> Review.Test.runOnModules
+                    (VariantLens.GenerateUsed.rule
+                        { build =
+                            VariantLens.GenerateUsed.accessorsBChiquet
+                                { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
+                        , name = VariantLens.GenerateUsed.prismNameVariant
+                        , generationModuleIsVariantModuleDotSuffix = "On"
+                        }
+                    )
+                |> Review.Test.expectErrorsForModules
+                    [ ( "Data.On"
+                      , [ Review.Test.error
+                            { message = "variant lens on `Data.Some` missing"
+                            , details =
+                                [ "A variant lens with this name is used in other `module`s."
+                                , "Add the generated lens declaration through the fix."
+                                ]
+                            , under = "exposing (..)"
+                            }
+                            |> Review.Test.whenFixed
+                                """module Data.On exposing (some)
+
+import Accessors exposing (Relation, makeOneToN, makeOneToOne)
+import Data exposing (Data(..))
+
+{-| Accessor lens for the variant `Data.Some` of the `type Data`.
+
+
+-}
+some :
+    Relation ( a, ( b, ( c, d ) ) ) reachable wrap -> Relation (Data a b c d) reachable (Maybe wrap)
+some =
+    makeOneToN
+        (\\variantValuesAlter variantType ->
+            case variantType of
+                Some value0 value1 value2 value3 ->
+                    ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter |> Just
+
+                _ ->
+                    Nothing
+        )
+        (\\variantValuesAlter variantType ->
+            case variantType of
+                Some value0 value1 value2 value3 ->
+                    let
+                        ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
+                            ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
+                    in
+                    Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
+
+                other ->
+                    other
+        )"""
+                        ]
+                      )
+                    ]
+        )
 
 
 reported : Test
