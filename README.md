@@ -93,12 +93,12 @@ import Accessors exposing (over)
 import Accessors.Library exposing (onEach)
 
 ... path newInput =
-    over                           --                  <target>
-        (Field.projects            -- { _ | projects : <Scroll ...> }
+    over                     --                  <target>
+        (Field.projects      -- { _ | projects : <Scroll ...> }
             << Scroll.focus
-            << Hand.onFilled       -- type Hand fill = Filled <fill> | ...
-            << Field.calls         -- { _ | projects : <List ...> }
-            << onEach              -- List (<Tree ...>)
+            << Hand.onFilled -- type Hand fill = Filled <fill> | ...
+            << Field.calls   -- { _ | projects : <List ...> }
+            << onEach        -- List (<Tree ...>)
             << Tree.elementAt path
         )
         (Tree.childPrepend newInput)
