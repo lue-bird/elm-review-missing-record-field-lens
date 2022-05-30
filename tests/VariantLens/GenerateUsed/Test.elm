@@ -92,7 +92,7 @@ one =
     makeOneToOne_
         "Data.One"
         (\\(One value0) -> value0)
-        (\\variantValuesAlter (One value0) -> value0 |> variantValuesAlter |> One)"""
+        (\\valuesAlter (One value0) -> value0 |> valuesAlter |> One)"""
                                 ]
                               )
                             ]
@@ -150,10 +150,10 @@ three =
     makeOneToOne_
         "Data.Three"
         (\\(Three value0 value1 value2) -> { value0 = value0, value1 = value1, value2 = value2 })
-        (\\variantValuesAlter (Three value0 value1 value2) ->
+        (\\valuesAlter (Three value0 value1 value2) ->
             let
                 altered =
-                    { value0 = value0, value1 = value1, value2 = value2 } |> variantValuesAlter
+                    { value0 = value0, value1 = value1, value2 = value2 } |> valuesAlter
             in
             Three altered.value0 altered.value1 altered.value2
         )"""
@@ -217,20 +217,20 @@ none : Relation () reachable wrap -> Relation Data reachable (Maybe wrap)
 none =
     makeOneToN_
         "Data.None"
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 None ->
-                    () |> variantValuesAlter |> Just
+                    () |> valuesAlter |> Just
 
                 _ ->
                     Nothing
         )
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 None ->
                     let
                         () =
-                            () |> variantValuesAlter
+                            () |> valuesAlter
                     in
                     None
 
@@ -294,18 +294,18 @@ some : Relation String reachable wrap -> Relation Data reachable (Maybe wrap)
 some =
     makeOneToN_
         "Data.Some"
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 ->
-                    value0 |> variantValuesAlter |> Just
+                    value0 |> valuesAlter |> Just
 
                 _ ->
                     Nothing
         )
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 ->
-                    value0 |> variantValuesAlter |> Some
+                    value0 |> valuesAlter |> Some
 
                 other ->
                     other
@@ -369,23 +369,23 @@ some :
 some =
     makeOneToN_
         "Data.Some"
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
                     { value0 = value0, value1 = value1, value2 = value2, value3 = value3 }
-                        |> variantValuesAlter
+                        |> valuesAlter
                         |> Just
 
                 _ ->
                     Nothing
         )
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
                     let
                         altered =
                             { value0 = value0, value1 = value1, value2 = value2, value3 = value3 }
-                                |> variantValuesAlter
+                                |> valuesAlter
                     in
                     Some altered.value0 altered.value1 altered.value2 altered.value3
 
@@ -459,7 +459,7 @@ one =
     makeOneToOne_
         "Data.One"
         (\\(One value0) -> value0)
-        (\\variantValuesAlter (One value0) -> value0 |> variantValuesAlter |> One)"""
+        (\\valuesAlter (One value0) -> value0 |> valuesAlter |> One)"""
                                 ]
                               )
                             ]
@@ -517,10 +517,10 @@ three =
     makeOneToOne_
         "Data.Three"
         (\\(Three value0 value1 value2) -> ( value0, ( value1, value2 ) ))
-        (\\variantValuesAlter (Three value0 value1 value2) ->
+        (\\valuesAlter (Three value0 value1 value2) ->
             let
                 ( alteredValue0, ( alteredValue1, alteredValue2 ) ) =
-                    ( value0, ( value1, value2 ) ) |> variantValuesAlter
+                    ( value0, ( value1, value2 ) ) |> valuesAlter
             in
             Three alteredValue0 alteredValue1 alteredValue2
         )"""
@@ -584,20 +584,20 @@ none : Relation () reachable wrap -> Relation Data reachable (Maybe wrap)
 none =
     makeOneToN_
         "Data.None"
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 None ->
-                    () |> variantValuesAlter |> Just
+                    () |> valuesAlter |> Just
 
                 _ ->
                     Nothing
         )
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 None ->
                     let
                         () =
-                            () |> variantValuesAlter
+                            () |> valuesAlter
                     in
                     None
 
@@ -661,18 +661,18 @@ some : Relation String reachable wrap -> Relation Data reachable (Maybe wrap)
 some =
     makeOneToN_
         "Data.Some"
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 ->
-                    value0 |> variantValuesAlter |> Just
+                    value0 |> valuesAlter |> Just
 
                 _ ->
                     Nothing
         )
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 ->
-                    value0 |> variantValuesAlter |> Some
+                    value0 |> valuesAlter |> Some
 
                 other ->
                     other
@@ -735,20 +735,20 @@ some :
 some =
     makeOneToN_
         "Data.Some"
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
-                    ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter |> Just
+                    ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
 
                 _ ->
                     Nothing
         )
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
                     let
                         ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                            ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
+                            ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
                     in
                     Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 
@@ -818,20 +818,20 @@ some :
     Relation ( a, ( b, ( c, d ) ) ) reachable wrap -> Relation (Data a b c d) reachable (Maybe wrap)
 some =
     makeOneToN
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
-                    ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter |> Just
+                    ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
 
                 _ ->
                     Nothing
         )
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
                     let
                         ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                            ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
+                            ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
                     in
                     Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 
@@ -956,20 +956,20 @@ some :
 some =
     makeOneToN_
         "Data.Some"
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
-                    ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter |> Just
+                    ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
 
                 _ ->
                     Nothing
         )
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 value1 value2 value3 ->
                     let
                         ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                            ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
+                            ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
                     in
                     Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 
@@ -1033,18 +1033,18 @@ some : Relation String reachable wrap -> Relation Data reachable (Maybe wrap)
 some =
     makeOneToN_
         "Data.Some"
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 ->
-                    value0 |> variantValuesAlter |> Just
+                    value0 |> valuesAlter |> Just
 
                 _ ->
                     Nothing
         )
-        (\\variantValuesAlter variantType ->
+        (\\valuesAlter variantType ->
             case variantType of
                 Some value0 ->
-                    value0 |> variantValuesAlter |> Some
+                    value0 |> valuesAlter |> Some
 
                 other ->
                     other

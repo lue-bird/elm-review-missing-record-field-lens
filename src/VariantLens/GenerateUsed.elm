@@ -161,10 +161,10 @@ for
 
 #### `alter`
 
-    \variantValuesAlter (Id value0 value1) ->
+    \valuesAlter (Id value0 value1) ->
         let
             ( alteredValue0, alteredValue1 ) =
-                ( value0, value1 ) |> variantValuesAlter
+                ( value0, value1 ) |> valuesAlter
         in
         Id alteredValue0 alteredValue1
 
@@ -199,7 +199,7 @@ variantOnly variant =
             (variantValuesRepresentation.inOne "value")
     , alter =
         CodeGen.lambda
-            [ CodeGen.varPattern "variantValuesAlter"
+            [ CodeGen.varPattern "valuesAlter"
             , variantPatternBuilt
             ]
             variantValuesRepresentation.alter
@@ -222,10 +222,10 @@ with
 
 #### `access`
 
-    \variantValuesAlter variantType ->
+    \valuesAlter variantType ->
         case variantType of
             Some value0 value1 value2 value3 ->
-                ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter |> Just
+                ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
 
             _ ->
                 Nothing
@@ -233,12 +233,12 @@ with
 
 #### `alter`
 
-    \variantValuesAlter variantType ->
+    \valuesAlter variantType ->
         case variantType of
             Some value0 value1 value2 value3 ->
                 let
                     ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                        ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
+                        ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
                 in
                 Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 
@@ -272,7 +272,7 @@ variantAmongMultiple variant =
     in
     { access =
         CodeGen.lambda
-            [ CodeGen.varPattern "variantValuesAlter"
+            [ CodeGen.varPattern "valuesAlter"
             , CodeGen.varPattern "variantType"
             ]
             (CodeGen.caseExpr (CodeGen.val "variantType")
@@ -280,7 +280,7 @@ variantAmongMultiple variant =
                   , CodeGen.binOpChain
                         (variantValuesRepresentation.inOne "value")
                         CodeGen.piper
-                        [ CodeGen.fun "variantValuesAlter"
+                        [ CodeGen.fun "valuesAlter"
                         , CodeGen.fun "Just"
                         ]
                   )
@@ -291,7 +291,7 @@ variantAmongMultiple variant =
             )
     , alter =
         CodeGen.lambda
-            [ CodeGen.varPattern "variantValuesAlter"
+            [ CodeGen.varPattern "valuesAlter"
             , CodeGen.varPattern "variantType"
             ]
             (CodeGen.caseExpr (CodeGen.val "variantType")
@@ -355,7 +355,7 @@ for
 
     let
         ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-            ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
+            ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
     in
     Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 
@@ -412,7 +412,7 @@ tupleNest variantInfo =
                         (CodeGen.applyBinOp
                             CodeGen.unit
                             CodeGen.piper
-                            (CodeGen.fun "variantValuesAlter")
+                            (CodeGen.fun "valuesAlter")
                         )
                     ]
                     (CodeGen.val variantInfo.name)
@@ -421,7 +421,7 @@ tupleNest variantInfo =
                 CodeGen.binOpChain
                     (CodeGen.val ("value" |> indexed 0))
                     CodeGen.piper
-                    [ CodeGen.fun "variantValuesAlter"
+                    [ CodeGen.fun "valuesAlter"
                     , CodeGen.fun variantInfo.name
                     ]
 
@@ -437,7 +437,7 @@ tupleNest variantInfo =
                         (CodeGen.applyBinOp
                             (inOne "value")
                             CodeGen.piper
-                            (CodeGen.fun "variantValuesAlter")
+                            (CodeGen.fun "valuesAlter")
                         )
                     ]
                     (CodeGen.construct variantInfo.name
@@ -499,7 +499,7 @@ for
     let
         altered =
             { value0 = value0, value1 = value1, value2 = value2, value3 = value3 }
-                |> variantValuesAlter
+                |> valuesAlter
     in
     Some altered.value0 altered.value1 altered.value2 altered.value3
 
@@ -567,7 +567,7 @@ valuesRecord variant =
                         (CodeGen.applyBinOp
                             CodeGen.unit
                             CodeGen.piper
-                            (CodeGen.fun "variantValuesAlter")
+                            (CodeGen.fun "valuesAlter")
                         )
                     ]
                     (CodeGen.val variant.name)
@@ -576,7 +576,7 @@ valuesRecord variant =
                 CodeGen.binOpChain
                     (CodeGen.val ("value" |> indexed 0))
                     CodeGen.piper
-                    [ CodeGen.fun "variantValuesAlter"
+                    [ CodeGen.fun "valuesAlter"
                     , CodeGen.fun variant.name
                     ]
 
@@ -592,7 +592,7 @@ valuesRecord variant =
                         (CodeGen.applyBinOp
                             (inOne "value")
                             CodeGen.piper
-                            (CodeGen.fun "variantValuesAlter")
+                            (CodeGen.fun "valuesAlter")
                         )
                     ]
                     (CodeGen.construct variant.name
@@ -642,20 +642,20 @@ generates
     some =
         makeOneToN_
             "Data.Some"
-            (\variantValuesAlter variantType ->
+            (\valuesAlter variantType ->
                 case variantType of
                     Some value0 value1 value2 value3 ->
-                        ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter |> Just
+                        ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
 
                     _ ->
                         Nothing
             )
-            (\variantValuesAlter variantType ->
+            (\valuesAlter variantType ->
                 case variantType of
                     Some value0 value1 value2 value3 ->
                         let
                             ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                                ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
+                                ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
                         in
                         Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 
@@ -799,20 +799,20 @@ generates
         -> Relation (Data a b c d) reachable (Maybe wrap)
     some =
         makeOneToN
-            (\variantValuesAlter variantType ->
+            (\valuesAlter variantType ->
                 case variantType of
                     Some value0 value1 value2 value3 ->
-                        ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter |> Just
+                        ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter |> Just
 
                     _ ->
                         Nothing
             )
-            (\variantValuesAlter variantType ->
+            (\valuesAlter variantType ->
                 case variantType of
                     Some value0 value1 value2 value3 ->
                         let
                             ( alteredValue0, ( alteredValue1, ( alteredValue2, alteredValue3 ) ) ) =
-                                ( value0, ( value1, ( value2, value3 ) ) ) |> variantValuesAlter
+                                ( value0, ( value1, ( value2, value3 ) ) ) |> valuesAlter
                         in
                         Some alteredValue0 alteredValue1 alteredValue2 alteredValue3
 
