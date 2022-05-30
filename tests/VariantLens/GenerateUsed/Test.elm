@@ -97,14 +97,79 @@ one =
                               )
                             ]
                 )
-            , Test.describe
-                "variants >= 2"
-                [ test
-                    "values 0"
-                    (\() ->
-                        [ """module Data.On exposing (..)
+            , test
+                "values >= 2"
+                (\() ->
+                    [ """module Data.On exposing (..)
 """
-                        , """module Use exposing (use)
+                    , """module Use exposing (use)
+
+import Data.On
+
+
+use =
+    Data.On.three
+"""
+                    , """module Data exposing (Three(..))
+
+type Three a
+    = Three String Int a
+"""
+                    ]
+                        |> Review.Test.runOnModules
+                            (VariantLens.GenerateUsed.rule
+                                { build =
+                                    VariantLens.GenerateUsed.accessors
+                                        { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
+                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                , generationModuleIsVariantModuleDotSuffix = "On"
+                                }
+                            )
+                        |> Review.Test.expectErrorsForModules
+                            [ ( "Data.On"
+                              , [ Review.Test.error
+                                    { message = "variant lens on `Data.Three` missing"
+                                    , details =
+                                        [ "A variant lens with this name is used in other `module`s."
+                                        , "Add the generated lens declaration through the fix."
+                                        ]
+                                    , under = "exposing (..)"
+                                    }
+                                    |> Review.Test.whenFixed
+                                        """module Data.On exposing (three)
+
+import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
+import Data exposing (Three(..))
+
+{-| Accessor lens for the variant `Data.Three` of the `type Three`.
+
+
+-}
+three : Lens (Three a) transformed { value0 : String, value1 : Int, value2 : a } wrap
+three =
+    makeOneToOne_
+        "Data.Three"
+        (\\(Three value0 value1 value2) -> { value0 = value0, value1 = value1, value2 = value2 })
+        (\\variantValuesAlter (Three value0 value1 value2) ->
+            let
+                altered =
+                    { value0 = value0, value1 = value1, value2 = value2 } |> variantValuesAlter
+            in
+            Three altered.value0 altered.value1 altered.value2
+        )"""
+                                ]
+                              )
+                            ]
+                )
+            ]
+        , Test.describe
+            "variants >= 2"
+            [ test
+                "values 0"
+                (\() ->
+                    [ """module Data.On exposing (..)
+"""
+                    , """module Use exposing (use)
 
 import Data.On
 
@@ -112,34 +177,34 @@ import Data.On
 use =
     Data.On.none
 """
-                        , """module Data exposing (Data(..))
+                    , """module Data exposing (Data(..))
 
 type Data
     = Some String
     | None
 """
-                        ]
-                            |> Review.Test.runOnModules
-                                (VariantLens.GenerateUsed.rule
-                                    { build =
-                                        VariantLens.GenerateUsed.accessors
-                                            { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
-                                    , name = VariantLens.GenerateUsed.prismNameVariant
-                                    , generationModuleIsVariantModuleDotSuffix = "On"
+                    ]
+                        |> Review.Test.runOnModules
+                            (VariantLens.GenerateUsed.rule
+                                { build =
+                                    VariantLens.GenerateUsed.accessors
+                                        { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
+                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                , generationModuleIsVariantModuleDotSuffix = "On"
+                                }
+                            )
+                        |> Review.Test.expectErrorsForModules
+                            [ ( "Data.On"
+                              , [ Review.Test.error
+                                    { message = "variant lens on `Data.None` missing"
+                                    , details =
+                                        [ "A variant lens with this name is used in other `module`s."
+                                        , "Add the generated lens declaration through the fix."
+                                        ]
+                                    , under = "exposing (..)"
                                     }
-                                )
-                            |> Review.Test.expectErrorsForModules
-                                [ ( "Data.On"
-                                  , [ Review.Test.error
-                                        { message = "variant lens on `Data.None` missing"
-                                        , details =
-                                            [ "A variant lens with this name is used in other `module`s."
-                                            , "Add the generated lens declaration through the fix."
-                                            ]
-                                        , under = "exposing (..)"
-                                        }
-                                        |> Review.Test.whenFixed
-                                            """module Data.On exposing (none)
+                                    |> Review.Test.whenFixed
+                                        """module Data.On exposing (none)
 
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
@@ -172,16 +237,16 @@ none =
                 other ->
                     other
         )"""
-                                    ]
-                                  )
                                 ]
-                    )
-                , test
-                    "values 1"
-                    (\() ->
-                        [ """module Data.On exposing (..)
+                              )
+                            ]
+                )
+            , test
+                "values 1"
+                (\() ->
+                    [ """module Data.On exposing (..)
 """
-                        , """module Use exposing (use)
+                    , """module Use exposing (use)
 
 import Data.On
 
@@ -189,34 +254,34 @@ import Data.On
 use =
     Data.On.some
 """
-                        , """module Data exposing (Data(..))
+                    , """module Data exposing (Data(..))
 
 type Data
     = Some String
     | None
 """
-                        ]
-                            |> Review.Test.runOnModules
-                                (VariantLens.GenerateUsed.rule
-                                    { build =
-                                        VariantLens.GenerateUsed.accessors
-                                            { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
-                                    , name = VariantLens.GenerateUsed.prismNameVariant
-                                    , generationModuleIsVariantModuleDotSuffix = "On"
+                    ]
+                        |> Review.Test.runOnModules
+                            (VariantLens.GenerateUsed.rule
+                                { build =
+                                    VariantLens.GenerateUsed.accessors
+                                        { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
+                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                , generationModuleIsVariantModuleDotSuffix = "On"
+                                }
+                            )
+                        |> Review.Test.expectErrorsForModules
+                            [ ( "Data.On"
+                              , [ Review.Test.error
+                                    { message = "variant lens on `Data.Some` missing"
+                                    , details =
+                                        [ "A variant lens with this name is used in other `module`s."
+                                        , "Add the generated lens declaration through the fix."
+                                        ]
+                                    , under = "exposing (..)"
                                     }
-                                )
-                            |> Review.Test.expectErrorsForModules
-                                [ ( "Data.On"
-                                  , [ Review.Test.error
-                                        { message = "variant lens on `Data.Some` missing"
-                                        , details =
-                                            [ "A variant lens with this name is used in other `module`s."
-                                            , "Add the generated lens declaration through the fix."
-                                            ]
-                                        , under = "exposing (..)"
-                                        }
-                                        |> Review.Test.whenFixed
-                                            """module Data.On exposing (some)
+                                    |> Review.Test.whenFixed
+                                        """module Data.On exposing (some)
 
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
@@ -245,22 +310,22 @@ some =
                 other ->
                     other
         )"""
-                                    ]
-                                  )
                                 ]
-                    )
-                , test
-                    "values >= 2"
-                    (\() ->
-                        [ """module Data exposing (Data(..))
+                              )
+                            ]
+                )
+            , test
+                "values >= 2"
+                (\() ->
+                    [ """module Data exposing (Data(..))
 
 type Data a b c d
     = Some a b c d
     | None
 """
-                        , """module Data.On exposing (..)
+                    , """module Data.On exposing (..)
 """
-                        , """module Use exposing (use)
+                    , """module Use exposing (use)
 
 import Data.On
 
@@ -268,28 +333,28 @@ import Data.On
 use =
     Data.On.some
 """
-                        ]
-                            |> Review.Test.runOnModules
-                                (VariantLens.GenerateUsed.rule
-                                    { build =
-                                        VariantLens.GenerateUsed.accessors
-                                            { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
-                                    , name = VariantLens.GenerateUsed.prismNameVariant
-                                    , generationModuleIsVariantModuleDotSuffix = "On"
+                    ]
+                        |> Review.Test.runOnModules
+                            (VariantLens.GenerateUsed.rule
+                                { build =
+                                    VariantLens.GenerateUsed.accessors
+                                        { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
+                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                , generationModuleIsVariantModuleDotSuffix = "On"
+                                }
+                            )
+                        |> Review.Test.expectErrorsForModules
+                            [ ( "Data.On"
+                              , [ Review.Test.error
+                                    { message = "variant lens on `Data.Some` missing"
+                                    , details =
+                                        [ "A variant lens with this name is used in other `module`s."
+                                        , "Add the generated lens declaration through the fix."
+                                        ]
+                                    , under = "exposing (..)"
                                     }
-                                )
-                            |> Review.Test.expectErrorsForModules
-                                [ ( "Data.On"
-                                  , [ Review.Test.error
-                                        { message = "variant lens on `Data.Some` missing"
-                                        , details =
-                                            [ "A variant lens with this name is used in other `module`s."
-                                            , "Add the generated lens declaration through the fix."
-                                            ]
-                                        , under = "exposing (..)"
-                                        }
-                                        |> Review.Test.whenFixed
-                                            """module Data.On exposing (some)
+                                    |> Review.Test.whenFixed
+                                        """module Data.On exposing (some)
 
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
@@ -327,11 +392,10 @@ some =
                 other ->
                     other
         )"""
-                                    ]
-                                  )
                                 ]
-                    )
-                ]
+                              )
+                            ]
+                )
             ]
         ]
 
@@ -400,14 +464,79 @@ one =
                               )
                             ]
                 )
-            , Test.describe
-                "variants >= 2"
-                [ test
-                    "values 0"
-                    (\() ->
-                        [ """module Data.On exposing (..)
+            , test
+                "values >= 2"
+                (\() ->
+                    [ """module Data.On exposing (..)
 """
-                        , """module Use exposing (use)
+                    , """module Use exposing (use)
+
+import Data.On
+
+
+use =
+    Data.On.three
+"""
+                    , """module Data exposing (Three(..))
+
+type Three a
+    = Three String Int a
+"""
+                    ]
+                        |> Review.Test.runOnModules
+                            (VariantLens.GenerateUsed.rule
+                                { build =
+                                    VariantLens.GenerateUsed.accessors
+                                        { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
+                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                , generationModuleIsVariantModuleDotSuffix = "On"
+                                }
+                            )
+                        |> Review.Test.expectErrorsForModules
+                            [ ( "Data.On"
+                              , [ Review.Test.error
+                                    { message = "variant lens on `Data.Three` missing"
+                                    , details =
+                                        [ "A variant lens with this name is used in other `module`s."
+                                        , "Add the generated lens declaration through the fix."
+                                        ]
+                                    , under = "exposing (..)"
+                                    }
+                                    |> Review.Test.whenFixed
+                                        """module Data.On exposing (three)
+
+import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
+import Data exposing (Three(..))
+
+{-| Accessor lens for the variant `Data.Three` of the `type Three`.
+
+
+-}
+three : Lens (Three a) transformed ( String, ( Int, a ) ) wrap
+three =
+    makeOneToOne_
+        "Data.Three"
+        (\\(Three value0 value1 value2) -> ( value0, ( value1, value2 ) ))
+        (\\variantValuesAlter (Three value0 value1 value2) ->
+            let
+                ( alteredValue0, ( alteredValue1, alteredValue2 ) ) =
+                    ( value0, ( value1, value2 ) ) |> variantValuesAlter
+            in
+            Three alteredValue0 alteredValue1 alteredValue2
+        )"""
+                                ]
+                              )
+                            ]
+                )
+            ]
+        , Test.describe
+            "variants >= 2"
+            [ test
+                "values 0"
+                (\() ->
+                    [ """module Data.On exposing (..)
+"""
+                    , """module Use exposing (use)
 
 import Data.On
 
@@ -415,34 +544,34 @@ import Data.On
 use =
     Data.On.none
 """
-                        , """module Data exposing (Data(..))
+                    , """module Data exposing (Data(..))
 
 type Data
     = Some String
     | None
 """
-                        ]
-                            |> Review.Test.runOnModules
-                                (VariantLens.GenerateUsed.rule
-                                    { build =
-                                        VariantLens.GenerateUsed.accessors
-                                            { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                                    , name = VariantLens.GenerateUsed.prismNameVariant
-                                    , generationModuleIsVariantModuleDotSuffix = "On"
+                    ]
+                        |> Review.Test.runOnModules
+                            (VariantLens.GenerateUsed.rule
+                                { build =
+                                    VariantLens.GenerateUsed.accessors
+                                        { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
+                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                , generationModuleIsVariantModuleDotSuffix = "On"
+                                }
+                            )
+                        |> Review.Test.expectErrorsForModules
+                            [ ( "Data.On"
+                              , [ Review.Test.error
+                                    { message = "variant lens on `Data.None` missing"
+                                    , details =
+                                        [ "A variant lens with this name is used in other `module`s."
+                                        , "Add the generated lens declaration through the fix."
+                                        ]
+                                    , under = "exposing (..)"
                                     }
-                                )
-                            |> Review.Test.expectErrorsForModules
-                                [ ( "Data.On"
-                                  , [ Review.Test.error
-                                        { message = "variant lens on `Data.None` missing"
-                                        , details =
-                                            [ "A variant lens with this name is used in other `module`s."
-                                            , "Add the generated lens declaration through the fix."
-                                            ]
-                                        , under = "exposing (..)"
-                                        }
-                                        |> Review.Test.whenFixed
-                                            """module Data.On exposing (none)
+                                    |> Review.Test.whenFixed
+                                        """module Data.On exposing (none)
 
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
@@ -475,16 +604,16 @@ none =
                 other ->
                     other
         )"""
-                                    ]
-                                  )
                                 ]
-                    )
-                , test
-                    "values 1"
-                    (\() ->
-                        [ """module Data.On exposing (..)
+                              )
+                            ]
+                )
+            , test
+                "values 1"
+                (\() ->
+                    [ """module Data.On exposing (..)
 """
-                        , """module Use exposing (use)
+                    , """module Use exposing (use)
 
 import Data.On
 
@@ -492,34 +621,34 @@ import Data.On
 use =
     Data.On.some
 """
-                        , """module Data exposing (Data(..))
+                    , """module Data exposing (Data(..))
 
 type Data
     = Some String
     | None
 """
-                        ]
-                            |> Review.Test.runOnModules
-                                (VariantLens.GenerateUsed.rule
-                                    { build =
-                                        VariantLens.GenerateUsed.accessors
-                                            { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                                    , name = VariantLens.GenerateUsed.prismNameVariant
-                                    , generationModuleIsVariantModuleDotSuffix = "On"
+                    ]
+                        |> Review.Test.runOnModules
+                            (VariantLens.GenerateUsed.rule
+                                { build =
+                                    VariantLens.GenerateUsed.accessors
+                                        { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
+                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                , generationModuleIsVariantModuleDotSuffix = "On"
+                                }
+                            )
+                        |> Review.Test.expectErrorsForModules
+                            [ ( "Data.On"
+                              , [ Review.Test.error
+                                    { message = "variant lens on `Data.Some` missing"
+                                    , details =
+                                        [ "A variant lens with this name is used in other `module`s."
+                                        , "Add the generated lens declaration through the fix."
+                                        ]
+                                    , under = "exposing (..)"
                                     }
-                                )
-                            |> Review.Test.expectErrorsForModules
-                                [ ( "Data.On"
-                                  , [ Review.Test.error
-                                        { message = "variant lens on `Data.Some` missing"
-                                        , details =
-                                            [ "A variant lens with this name is used in other `module`s."
-                                            , "Add the generated lens declaration through the fix."
-                                            ]
-                                        , under = "exposing (..)"
-                                        }
-                                        |> Review.Test.whenFixed
-                                            """module Data.On exposing (some)
+                                    |> Review.Test.whenFixed
+                                        """module Data.On exposing (some)
 
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
@@ -548,22 +677,22 @@ some =
                 other ->
                     other
         )"""
-                                    ]
-                                  )
                                 ]
-                    )
-                , test
-                    "values >= 2"
-                    (\() ->
-                        [ """module Data exposing (Data(..))
+                              )
+                            ]
+                )
+            , test
+                "values >= 2"
+                (\() ->
+                    [ """module Data exposing (Data(..))
 
 type Data a b c d
     = Some a b c d
     | None
 """
-                        , """module Data.On exposing (..)
+                    , """module Data.On exposing (..)
 """
-                        , """module Use exposing (use)
+                    , """module Use exposing (use)
 
 import Data.On
 
@@ -571,28 +700,28 @@ import Data.On
 use =
     Data.On.some
 """
-                        ]
-                            |> Review.Test.runOnModules
-                                (VariantLens.GenerateUsed.rule
-                                    { build =
-                                        VariantLens.GenerateUsed.accessors
-                                            { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                                    , name = VariantLens.GenerateUsed.prismNameVariant
-                                    , generationModuleIsVariantModuleDotSuffix = "On"
+                    ]
+                        |> Review.Test.runOnModules
+                            (VariantLens.GenerateUsed.rule
+                                { build =
+                                    VariantLens.GenerateUsed.accessors
+                                        { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
+                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                , generationModuleIsVariantModuleDotSuffix = "On"
+                                }
+                            )
+                        |> Review.Test.expectErrorsForModules
+                            [ ( "Data.On"
+                              , [ Review.Test.error
+                                    { message = "variant lens on `Data.Some` missing"
+                                    , details =
+                                        [ "A variant lens with this name is used in other `module`s."
+                                        , "Add the generated lens declaration through the fix."
+                                        ]
+                                    , under = "exposing (..)"
                                     }
-                                )
-                            |> Review.Test.expectErrorsForModules
-                                [ ( "Data.On"
-                                  , [ Review.Test.error
-                                        { message = "variant lens on `Data.Some` missing"
-                                        , details =
-                                            [ "A variant lens with this name is used in other `module`s."
-                                            , "Add the generated lens declaration through the fix."
-                                            ]
-                                        , under = "exposing (..)"
-                                        }
-                                        |> Review.Test.whenFixed
-                                            """module Data.On exposing (some)
+                                    |> Review.Test.whenFixed
+                                        """module Data.On exposing (some)
 
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
@@ -626,11 +755,10 @@ some =
                 other ->
                     other
         )"""
-                                    ]
-                                  )
                                 ]
-                    )
-                ]
+                              )
+                            ]
+                )
             ]
         ]
 
