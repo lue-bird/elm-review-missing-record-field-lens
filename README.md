@@ -7,7 +7,7 @@ this package contains _multiple_ [`elm-review`](https://package.elm-lang.org/pac
 When [`lue-bird/generate-elm`](https://github.com/lue-bird/generate-elm) – a framework for making code generation easy and safe –
 is finished, every functionality will be ported over.
 
-## `NoMissingRecordFieldLens`
+-----
 
 You find yourself writing code like ↓ ?
 
@@ -88,7 +88,7 @@ Seeing a pattern? You can, to put the cherry on the cake, _compose_ those "lense
 
 ```elm
 import Field
-import Hand.Extra.Local as Hand
+import Hand.On
 import Accessors exposing (over)
 import Accessors.Library exposing (onEach)
 
@@ -96,7 +96,7 @@ import Accessors.Library exposing (onEach)
     over                     --                  <target>
         (Field.projects      -- { _ | projects : <Scroll ...> }
             << Scroll.focus
-            << Hand.onFilled -- type Hand fill = Filled <fill> | ...
+            << Hand.On.filled -- type Hand fill = Filled <fill> | ...
             << Field.calls   -- { _ | projects : <List ...> }
             << onEach        -- List (<Tree ...>)
             << Tree.elementAt path
@@ -110,7 +110,9 @@ Methods like this make your code more **readable**. Compare with the first examp
 
 In the last examples
 - `projects`, `calls` lenses will be generated in `module Field`
-- `onFilled` lens will be generated in `module Hand.Extra.Local` by [`VariantLens.GenerateUsed`](#VariantLens.GenerateUsed) 
+- `Hand.On.filled` lens will be generated in `module Hand.On` by [`VariantLens.GenerateUsed`](#VariantLens.GenerateUsed) 
+
+## `NoMissingRecordFieldLens`
 
 ### try without installing
 
@@ -146,7 +148,53 @@ See [`Config`](NoMissingRecordFieldLens#Config)
 
 It's also possible to generate custom lenses or to customize the generation of existing ones.
 
-### pitfalls
+
+## `VariantLens.GenerateUsed`
+
+Lenses for the values of one variant.
+
+With the [`Config`](VariantLens-GenerateUsed#Config) below,
+calling `YourVariantType.onOneOfThree`,
+the rule will automatically
+  - `import YourVariantType.On`
+  - generate non-existent prisms `YourVariantType.On.variantName`
+
+### try without installing
+
+```bash
+elm-review --template lue-bird/elm-review-missing-record-field-lens/example/variant-accessors
+```
+
+### configure
+
+```elm
+module ReviewConfig exposing (config)
+
+import Review.Rule as Rule exposing (Rule)
+import VariantLens.GenerateUsed
+
+config : List Rule
+config =
+    [ VariantLens.GenerateUsed.rule
+        { build =
+            VariantLens.GenerateUsed.accessors
+                { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
+        , name = VariantLens.GenerateUsed.prismNameVariant
+        , generationModuleIsVariantModuleDotSuffix = "On"
+        }
+    ]
+```
+**Check out [`Config`](VariantLens-GenerateUsed#Config)!**
+
+### lenses that work out of the box
+
+- [erlandsona/elm-accessors](https://package.elm-lang.org/packages/erlandsona/elm-accessors/latest)
+- [bChiquet/elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
+
+It's also possible to generate custom prisms or to customize the generation of existing ones.
+
+
+## pitfalls
 
 Don't let this pattern warp you into overusing nesting.
 
@@ -195,52 +243,6 @@ Only if the API interaction happens to mirror that behavior, Dōzo!
 When parts are logically connected like an `Address` or a [`Camera`](https://package.elm-lang.org/packages/ianmackenzie/elm-3d-camera/latest).
 Make sure to make types, packages, ... out of these.
 Don't [obsessively employ primitives](https://elm-radio.com/episode/primitive-obsession/).
-
-
-## `VariantLens.GenerateUsed`
-
-The motivations for using this are similar to [`NoMissingRecordFieldLens`](#NoMissingRecordFieldLens),
-this time trying to cut down on situations where you're only interested in values of one variant.
-
-With the [`Config`](VariantLens-GenerateUsed#Config) below,
-calling `YourVariantType.onOneOfThree`,
-the rule will automatically
-- `import YourVariantType.Extra.Local as YourVariantType`
-- generate non-existent prisms in `YourVariantType.Extra.Local`
-
-### try without installing
-
-```bash
-elm-review --template lue-bird/elm-review-missing-record-field-lens/example/variant-accessors
-```
-
-### configure
-
-```elm
-module ReviewConfig exposing (config)
-
-import Review.Rule as Rule exposing (Rule)
-import VariantLens.GenerateUsed
-
-config : List Rule
-config =
-    [ VariantLens.GenerateUsed.rule
-        { build =
-            VariantLens.GenerateUsed.accessors
-                { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
-        , name = VariantLens.GenerateUsed.prismNameVariant
-        , generationModuleIsVariantModuleDotSuffix = "On"
-        }
-    ]
-```
-**Check out [`Config`](VariantLens-GenerateUsed#Config)!**
-
-### prisms that work out of the box
-
-- [erlandsona/elm-accessors](https://package.elm-lang.org/packages/erlandsona/elm-accessors/latest)
-- [bChiquet/elm-accessors](https://package.elm-lang.org/packages/bChiquet/elm-accessors/latest)
-
-It's also possible to generate custom prisms or to customize the generation of existing ones.
 
 
 ## suggestions?
