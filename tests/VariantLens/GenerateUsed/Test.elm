@@ -85,7 +85,6 @@ import Data exposing (One(..))
 
 {-| Accessor lens for the variant `Data.One` of the `type One`.
 
-
 -}
 one : Lens One transformed String wrap
 one =
@@ -142,7 +141,6 @@ import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Three(..))
 
 {-| Accessor lens for the variant `Data.Three` of the `type Three`.
-
 
 -}
 three : Lens (Three a) transformed { value0 : String, value1 : Int, value2 : a } wrap
@@ -210,7 +208,6 @@ import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
 {-| Accessor lens for the variant `Data.None` of the `type Data`.
-
 
 -}
 none : Relation () reachable wrap -> Relation Data reachable (Maybe wrap)
@@ -288,7 +285,6 @@ import Data exposing (Data(..))
 
 {-| Accessor lens for the variant `Data.Some` of the `type Data`.
 
-
 -}
 some : Relation String reachable wrap -> Relation Data reachable (Maybe wrap)
 some =
@@ -360,7 +356,6 @@ import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
 {-| Accessor lens for the variant `Data.Some` of the `type Data`.
-
 
 -}
 some :
@@ -452,7 +447,6 @@ import Data exposing (One(..))
 
 {-| Accessor lens for the variant `Data.One` of the `type One`.
 
-
 -}
 one : Lens One transformed String wrap
 one =
@@ -509,7 +503,6 @@ import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Three(..))
 
 {-| Accessor lens for the variant `Data.Three` of the `type Three`.
-
 
 -}
 three : Lens (Three a) transformed ( String, ( Int, a ) ) wrap
@@ -577,7 +570,6 @@ import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
 {-| Accessor lens for the variant `Data.None` of the `type Data`.
-
 
 -}
 none : Relation () reachable wrap -> Relation Data reachable (Maybe wrap)
@@ -655,7 +647,6 @@ import Data exposing (Data(..))
 
 {-| Accessor lens for the variant `Data.Some` of the `type Data`.
 
-
 -}
 some : Relation String reachable wrap -> Relation Data reachable (Maybe wrap)
 some =
@@ -727,7 +718,6 @@ import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
 {-| Accessor lens for the variant `Data.Some` of the `type Data`.
-
 
 -}
 some :
@@ -811,7 +801,6 @@ import Accessors exposing (Relation, makeOneToN, makeOneToOne)
 import Data exposing (Data(..))
 
 {-| Accessor lens for the variant `Data.Some` of the `type Data`.
-
 
 -}
 some :
@@ -949,7 +938,6 @@ import Data exposing (Data(..))
 
 {-| Accessor lens for the variant `Data.Some` of the `type Data`.
 
-
 -}
 some :
     Relation ( a, ( b, ( c, d ) ) ) reachable wrap -> Relation (Data a b c d) reachable (Maybe wrap)
@@ -1026,7 +1014,6 @@ import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
 {-| Accessor lens for the variant `Data.Some` of the `type Data`.
-
 
 -}
 some : Relation String reachable wrap -> Relation Data reachable (Maybe wrap)
