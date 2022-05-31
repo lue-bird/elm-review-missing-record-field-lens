@@ -16,7 +16,7 @@
             "stil4m/elm-syntax": "7.2.9",
             "the-sett/elm-pretty-printer": "3.0.0",
             "the-sett/elm-syntax-dsl": "6.0.1",
-            "lue-bird/elm-review-missing-record-field-lens": "1.1.1"
+            "lue-bird/elm-review-missing-record-field-lens": "1.1.2"
         },
         "indirect": {
             "Chadtech/elm-bool-extra": "2.4.2",

@@ -3,7 +3,7 @@
     "name": "lue-bird/elm-review-missing-record-field-lens",
     "summary": "elm-review: generate used lenses",
     "license": "MIT",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "exposed-modules": [
         "VariantLens.GenerateUsed",
         "NoMissingRecordFieldLens"
