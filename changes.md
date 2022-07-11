@@ -1,3 +1,8 @@
+## 2.0.0 plans
+
+- variant lens name → prism
+    - including `module VariantLens.GenerateUsed` name → `VariantPrism.GenerateUsed`
+
 # changelog
 
 ### 1.1.0
