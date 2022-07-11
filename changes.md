@@ -2,6 +2,8 @@
 
 - variant lens name → prism
     - including `module VariantLens.GenerateUsed` name → `VariantPrism.GenerateUsed`
+- `module`-internal prism generation support
+    - name configuration add
 
 # changelog
 
