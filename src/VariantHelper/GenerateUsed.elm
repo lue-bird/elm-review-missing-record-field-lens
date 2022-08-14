@@ -1074,7 +1074,7 @@ type alias VariantHelperBuild =
         }
 
 
-{-| [Build](#Build) a different documentation:
+{-| [Build](#VariantHelperBuild) a different documentation:
 
     accessorsDocumentedCustom info =
         accessors
