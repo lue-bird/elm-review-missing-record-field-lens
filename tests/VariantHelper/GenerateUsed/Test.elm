@@ -8,7 +8,7 @@ import VariantHelper.GenerateUsed
 all : Test
 all =
     Test.describe
-        "VariantLens.GenerateUsed"
+        "VariantHelper.GenerateUsed"
         [ reported
         , accepted
         , build

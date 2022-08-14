@@ -12,16 +12,16 @@ when inside the directory containing this file.
 -}
 
 import Review.Rule as Rule exposing (Rule)
-import VariantLens.GenerateUsed
+import VariantHelper.GenerateUsed
 
 config : List Rule
 config =
-    [ VariantLens.GenerateUsed.rule
+    [ VariantHelper.GenerateUsed.rule
         { build =
-            VariantLens.GenerateUsed.accessors
-                { valuesCombined = VariantLens.GenerateUsed.valuesRecord }
-        , nameInModuleInternal = VariantLens.GenerateUsed.onVariant
-        , nameInModuleExternal = VariantLens.GenerateUsed.variant
+            VariantHelper.GenerateUsed.accessors
+                { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
+        , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+        , nameInModuleExternal = VariantHelper.GenerateUsed.variant
         , generationModuleIsVariantModuleDotSuffix = "On"
         }
     ]
