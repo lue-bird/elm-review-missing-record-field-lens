@@ -1,5 +1,9 @@
 # changelog
 
+#### 2.0.1
+
+- documentation corrections
+
 ## 2.0.0
 
 (mostly suggested by [@erlandsona](https://github.com/erlandsona))
