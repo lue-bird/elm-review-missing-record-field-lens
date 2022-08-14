@@ -4,9 +4,8 @@ import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
 import Elm.Docs
 import Elm.Pretty as CodeGen
-import Elm.Syntax.Declaration as Declaration exposing (Declaration)
 import Elm.Syntax.ModuleName exposing (ModuleName)
-import Elm.Syntax.Node as Node exposing (Node(..))
+import Elm.Syntax.Node exposing (Node(..))
 import Elm.Syntax.Range as Range exposing (Location)
 import Elm.Syntax.TypeAnnotation as Type exposing (TypeAnnotation)
 import Elm.Type
