@@ -19,8 +19,9 @@ config =
     [ VariantLens.GenerateUsed.rule
         { build =
             VariantLens.GenerateUsed.accessors
-                { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
-        , name = VariantLens.GenerateUsed.prismNameVariant
+                { valuesCombined = VariantLens.GenerateUsed.valuesRecord }
+        , nameInModuleInternal = VariantLens.GenerateUsed.onVariant
+        , nameInModuleExternal = VariantLens.GenerateUsed.variant
         , generationModuleIsVariantModuleDotSuffix = "On"
         }
     ]

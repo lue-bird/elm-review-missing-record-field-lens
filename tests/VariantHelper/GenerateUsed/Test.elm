@@ -1,8 +1,8 @@
-module VariantLens.GenerateUsed.Test exposing (all)
+module VariantHelper.GenerateUsed.Test exposing (all)
 
 import Review.Test
 import Test exposing (Test, test)
-import VariantLens.GenerateUsed
+import VariantHelper.GenerateUsed
 
 
 all : Test
@@ -29,7 +29,7 @@ buildAccessors =
     Test.describe
         "accessors"
         [ buildAccessorsValuesRecord
-        , buildAccessorsTupleNest
+        , buildAccessorsValuesTupleNest
         ]
 
 
@@ -59,21 +59,22 @@ type One
 """
                     ]
                         |> Review.Test.runOnModules
-                            (VariantLens.GenerateUsed.rule
+                            (VariantHelper.GenerateUsed.rule
                                 { build =
-                                    VariantLens.GenerateUsed.accessors
-                                        { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
-                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                    VariantHelper.GenerateUsed.accessors
+                                        { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
                             )
                         |> Review.Test.expectErrorsForModules
                             [ ( "Data.On"
                               , [ Review.Test.error
-                                    { message = "variant lens on `Data.One` missing"
+                                    { message = "variant helper on `Data.One` missing"
                                     , details =
-                                        [ "A variant lens with this name is used in other `module`s."
-                                        , "Add the generated lens declaration through the fix."
+                                        [ "A variant helper with this name is used in other `module`s."
+                                        , "Add the generated helper declaration through the fix."
                                         ]
                                     , under = "exposing (..)"
                                     }
@@ -82,6 +83,7 @@ type One
 
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (One(..))
+
 
 {-| Accessor lens for the variant `Data.One` of the `type One`.
 
@@ -116,21 +118,22 @@ type Three a
 """
                     ]
                         |> Review.Test.runOnModules
-                            (VariantLens.GenerateUsed.rule
+                            (VariantHelper.GenerateUsed.rule
                                 { build =
-                                    VariantLens.GenerateUsed.accessors
-                                        { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
-                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                    VariantHelper.GenerateUsed.accessors
+                                        { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
                             )
                         |> Review.Test.expectErrorsForModules
                             [ ( "Data.On"
                               , [ Review.Test.error
-                                    { message = "variant lens on `Data.Three` missing"
+                                    { message = "variant helper on `Data.Three` missing"
                                     , details =
-                                        [ "A variant lens with this name is used in other `module`s."
-                                        , "Add the generated lens declaration through the fix."
+                                        [ "A variant helper with this name is used in other `module`s."
+                                        , "Add the generated helper declaration through the fix."
                                         ]
                                     , under = "exposing (..)"
                                     }
@@ -139,6 +142,7 @@ type Three a
 
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Three(..))
+
 
 {-| Accessor lens for the variant `Data.Three` of the `type Three`.
 
@@ -183,21 +187,22 @@ type Data
 """
                     ]
                         |> Review.Test.runOnModules
-                            (VariantLens.GenerateUsed.rule
+                            (VariantHelper.GenerateUsed.rule
                                 { build =
-                                    VariantLens.GenerateUsed.accessors
-                                        { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
-                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                    VariantHelper.GenerateUsed.accessors
+                                        { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
                             )
                         |> Review.Test.expectErrorsForModules
                             [ ( "Data.On"
                               , [ Review.Test.error
-                                    { message = "variant lens on `Data.None` missing"
+                                    { message = "variant helper on `Data.None` missing"
                                     , details =
-                                        [ "A variant lens with this name is used in other `module`s."
-                                        , "Add the generated lens declaration through the fix."
+                                        [ "A variant helper with this name is used in other `module`s."
+                                        , "Add the generated helper declaration through the fix."
                                         ]
                                     , under = "exposing (..)"
                                     }
@@ -207,7 +212,8 @@ type Data
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
-{-| Accessor lens for the variant `Data.None` of the `type Data`.
+
+{-| Accessor prism for the variant `Data.None` of the `type Data`.
 
 -}
 none : Relation () reachable wrap -> Relation Data reachable (Maybe wrap)
@@ -222,18 +228,7 @@ none =
                 _ ->
                     Nothing
         )
-        (\\valuesAlter variantType ->
-            case variantType of
-                None ->
-                    let
-                        () =
-                            () |> valuesAlter
-                    in
-                    None
-
-                other ->
-                    other
-        )"""
+        (\\_ -> identity)"""
                                 ]
                               )
                             ]
@@ -259,21 +254,22 @@ type Data
 """
                     ]
                         |> Review.Test.runOnModules
-                            (VariantLens.GenerateUsed.rule
+                            (VariantHelper.GenerateUsed.rule
                                 { build =
-                                    VariantLens.GenerateUsed.accessors
-                                        { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
-                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                    VariantHelper.GenerateUsed.accessors
+                                        { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
                             )
                         |> Review.Test.expectErrorsForModules
                             [ ( "Data.On"
                               , [ Review.Test.error
-                                    { message = "variant lens on `Data.Some` missing"
+                                    { message = "variant helper on `Data.Some` missing"
                                     , details =
-                                        [ "A variant lens with this name is used in other `module`s."
-                                        , "Add the generated lens declaration through the fix."
+                                        [ "A variant helper with this name is used in other `module`s."
+                                        , "Add the generated helper declaration through the fix."
                                         ]
                                     , under = "exposing (..)"
                                     }
@@ -283,7 +279,8 @@ type Data
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
-{-| Accessor lens for the variant `Data.Some` of the `type Data`.
+
+{-| Accessor prism for the variant `Data.Some` of the `type Data`.
 
 -}
 some : Relation String reachable wrap -> Relation Data reachable (Maybe wrap)
@@ -331,21 +328,22 @@ use =
 """
                     ]
                         |> Review.Test.runOnModules
-                            (VariantLens.GenerateUsed.rule
+                            (VariantHelper.GenerateUsed.rule
                                 { build =
-                                    VariantLens.GenerateUsed.accessors
-                                        { valuesRepresent = VariantLens.GenerateUsed.valuesRecord }
-                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                    VariantHelper.GenerateUsed.accessors
+                                        { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
                             )
                         |> Review.Test.expectErrorsForModules
                             [ ( "Data.On"
                               , [ Review.Test.error
-                                    { message = "variant lens on `Data.Some` missing"
+                                    { message = "variant helper on `Data.Some` missing"
                                     , details =
-                                        [ "A variant lens with this name is used in other `module`s."
-                                        , "Add the generated lens declaration through the fix."
+                                        [ "A variant helper with this name is used in other `module`s."
+                                        , "Add the generated helper declaration through the fix."
                                         ]
                                     , under = "exposing (..)"
                                     }
@@ -355,7 +353,8 @@ use =
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
-{-| Accessor lens for the variant `Data.Some` of the `type Data`.
+
+{-| Accessor prism for the variant `Data.Some` of the `type Data`.
 
 -}
 some :
@@ -395,10 +394,10 @@ some =
         ]
 
 
-buildAccessorsTupleNest : Test
-buildAccessorsTupleNest =
+buildAccessorsValuesTupleNest : Test
+buildAccessorsValuesTupleNest =
     Test.describe
-        "tupleNest"
+        "valuesTupleNest"
         [ Test.describe
             "variants 1"
             [ test
@@ -421,21 +420,22 @@ type One
 """
                     ]
                         |> Review.Test.runOnModules
-                            (VariantLens.GenerateUsed.rule
+                            (VariantHelper.GenerateUsed.rule
                                 { build =
-                                    VariantLens.GenerateUsed.accessors
-                                        { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                    VariantHelper.GenerateUsed.accessors
+                                        { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
                             )
                         |> Review.Test.expectErrorsForModules
                             [ ( "Data.On"
                               , [ Review.Test.error
-                                    { message = "variant lens on `Data.One` missing"
+                                    { message = "variant helper on `Data.One` missing"
                                     , details =
-                                        [ "A variant lens with this name is used in other `module`s."
-                                        , "Add the generated lens declaration through the fix."
+                                        [ "A variant helper with this name is used in other `module`s."
+                                        , "Add the generated helper declaration through the fix."
                                         ]
                                     , under = "exposing (..)"
                                     }
@@ -444,6 +444,7 @@ type One
 
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (One(..))
+
 
 {-| Accessor lens for the variant `Data.One` of the `type One`.
 
@@ -478,21 +479,22 @@ type Three a
 """
                     ]
                         |> Review.Test.runOnModules
-                            (VariantLens.GenerateUsed.rule
+                            (VariantHelper.GenerateUsed.rule
                                 { build =
-                                    VariantLens.GenerateUsed.accessors
-                                        { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                    VariantHelper.GenerateUsed.accessors
+                                        { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
                             )
                         |> Review.Test.expectErrorsForModules
                             [ ( "Data.On"
                               , [ Review.Test.error
-                                    { message = "variant lens on `Data.Three` missing"
+                                    { message = "variant helper on `Data.Three` missing"
                                     , details =
-                                        [ "A variant lens with this name is used in other `module`s."
-                                        , "Add the generated lens declaration through the fix."
+                                        [ "A variant helper with this name is used in other `module`s."
+                                        , "Add the generated helper declaration through the fix."
                                         ]
                                     , under = "exposing (..)"
                                     }
@@ -501,6 +503,7 @@ type Three a
 
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Three(..))
+
 
 {-| Accessor lens for the variant `Data.Three` of the `type Three`.
 
@@ -545,21 +548,22 @@ type Data
 """
                     ]
                         |> Review.Test.runOnModules
-                            (VariantLens.GenerateUsed.rule
+                            (VariantHelper.GenerateUsed.rule
                                 { build =
-                                    VariantLens.GenerateUsed.accessors
-                                        { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                    VariantHelper.GenerateUsed.accessors
+                                        { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
                             )
                         |> Review.Test.expectErrorsForModules
                             [ ( "Data.On"
                               , [ Review.Test.error
-                                    { message = "variant lens on `Data.None` missing"
+                                    { message = "variant helper on `Data.None` missing"
                                     , details =
-                                        [ "A variant lens with this name is used in other `module`s."
-                                        , "Add the generated lens declaration through the fix."
+                                        [ "A variant helper with this name is used in other `module`s."
+                                        , "Add the generated helper declaration through the fix."
                                         ]
                                     , under = "exposing (..)"
                                     }
@@ -569,7 +573,8 @@ type Data
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
-{-| Accessor lens for the variant `Data.None` of the `type Data`.
+
+{-| Accessor prism for the variant `Data.None` of the `type Data`.
 
 -}
 none : Relation () reachable wrap -> Relation Data reachable (Maybe wrap)
@@ -584,18 +589,7 @@ none =
                 _ ->
                     Nothing
         )
-        (\\valuesAlter variantType ->
-            case variantType of
-                None ->
-                    let
-                        () =
-                            () |> valuesAlter
-                    in
-                    None
-
-                other ->
-                    other
-        )"""
+        (\\_ -> identity)"""
                                 ]
                               )
                             ]
@@ -621,21 +615,22 @@ type Data
 """
                     ]
                         |> Review.Test.runOnModules
-                            (VariantLens.GenerateUsed.rule
+                            (VariantHelper.GenerateUsed.rule
                                 { build =
-                                    VariantLens.GenerateUsed.accessors
-                                        { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                    VariantHelper.GenerateUsed.accessors
+                                        { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
                             )
                         |> Review.Test.expectErrorsForModules
                             [ ( "Data.On"
                               , [ Review.Test.error
-                                    { message = "variant lens on `Data.Some` missing"
+                                    { message = "variant helper on `Data.Some` missing"
                                     , details =
-                                        [ "A variant lens with this name is used in other `module`s."
-                                        , "Add the generated lens declaration through the fix."
+                                        [ "A variant helper with this name is used in other `module`s."
+                                        , "Add the generated helper declaration through the fix."
                                         ]
                                     , under = "exposing (..)"
                                     }
@@ -645,7 +640,8 @@ type Data
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
-{-| Accessor lens for the variant `Data.Some` of the `type Data`.
+
+{-| Accessor prism for the variant `Data.Some` of the `type Data`.
 
 -}
 some : Relation String reachable wrap -> Relation Data reachable (Maybe wrap)
@@ -693,21 +689,22 @@ use =
 """
                     ]
                         |> Review.Test.runOnModules
-                            (VariantLens.GenerateUsed.rule
+                            (VariantHelper.GenerateUsed.rule
                                 { build =
-                                    VariantLens.GenerateUsed.accessors
-                                        { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                                , name = VariantLens.GenerateUsed.prismNameVariant
+                                    VariantHelper.GenerateUsed.accessors
+                                        { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
                             )
                         |> Review.Test.expectErrorsForModules
                             [ ( "Data.On"
                               , [ Review.Test.error
-                                    { message = "variant lens on `Data.Some` missing"
+                                    { message = "variant helper on `Data.Some` missing"
                                     , details =
-                                        [ "A variant lens with this name is used in other `module`s."
-                                        , "Add the generated lens declaration through the fix."
+                                        [ "A variant helper with this name is used in other `module`s."
+                                        , "Add the generated helper declaration through the fix."
                                         ]
                                     , under = "exposing (..)"
                                     }
@@ -717,7 +714,8 @@ use =
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
-{-| Accessor lens for the variant `Data.Some` of the `type Data`.
+
+{-| Accessor prism for the variant `Data.Some` of the `type Data`.
 
 -}
 some :
@@ -756,7 +754,7 @@ some =
 buildAccessorsBChiquet : Test
 buildAccessorsBChiquet =
     test
-        "accessorsBChiquet, tupleNest, variants >= 2, values >= 2"
+        "accessorsBChiquet, valuesTupleNest, variants >= 2, values >= 2"
         (\() ->
             [ """module Data exposing (Data(..))
 
@@ -776,21 +774,22 @@ use =
 """
             ]
                 |> Review.Test.runOnModules
-                    (VariantLens.GenerateUsed.rule
+                    (VariantHelper.GenerateUsed.rule
                         { build =
-                            VariantLens.GenerateUsed.accessorsBChiquet
-                                { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                        , name = VariantLens.GenerateUsed.prismNameVariant
+                            VariantHelper.GenerateUsed.accessorsBChiquet
+                                { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                        , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                        , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                         , generationModuleIsVariantModuleDotSuffix = "On"
                         }
                     )
                 |> Review.Test.expectErrorsForModules
                     [ ( "Data.On"
                       , [ Review.Test.error
-                            { message = "variant lens on `Data.Some` missing"
+                            { message = "variant helper on `Data.Some` missing"
                             , details =
-                                [ "A variant lens with this name is used in other `module`s."
-                                , "Add the generated lens declaration through the fix."
+                                [ "A variant helper with this name is used in other `module`s."
+                                , "Add the generated helper declaration through the fix."
                                 ]
                             , under = "exposing (..)"
                             }
@@ -800,7 +799,8 @@ use =
 import Accessors exposing (Relation, makeOneToN, makeOneToOne)
 import Data exposing (Data(..))
 
-{-| Accessor lens for the variant `Data.Some` of the `type Data`.
+
+{-| Accessor prism for the variant `Data.Some` of the `type Data`.
 
 -}
 some :
@@ -855,20 +855,21 @@ use = Data.On.one
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantLens.GenerateUsed.rule
+                        (VariantHelper.GenerateUsed.rule
                             { build =
-                                VariantLens.GenerateUsed.accessors
-                                    { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                            , name = VariantLens.GenerateUsed.prismNameVariant
+                                VariantHelper.GenerateUsed.accessors
+                                    { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
                         )
                     |> Review.Test.expectErrorsForModules
                         [ ( "Use"
                           , [ Review.Test.error
-                                { message = "variant lens generation `module Data.On` missing"
+                                { message = "variant helper generation `module Data.On` missing"
                                 , details =
-                                    [ "Create such an elm file where variant prisms will be generated in."
+                                    [ "Create an elm file where variant helpers will be generated in."
                                     , "At the time of writing, [`elm-review` isn't able to generate new files](https://github.com/jfmengels/elm-review/issues/125)."
                                     ]
                                 , under = "Data.On.one"
@@ -895,11 +896,12 @@ type Data a b c d
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantLens.GenerateUsed.rule
+                        (VariantHelper.GenerateUsed.rule
                             { build =
-                                VariantLens.GenerateUsed.accessors
-                                    { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                            , name = VariantLens.GenerateUsed.prismNameVariant
+                                VariantHelper.GenerateUsed.accessors
+                                    { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
                         )
@@ -908,7 +910,7 @@ type Data a b c d
                           , [ Review.Test.error
                                 { message = "`import Data.On` missing"
                                 , details =
-                                    [ "Add the variant lens generation `module` `import` through the supplied fix."
+                                    [ "Add the variant helper generation `module` `import` through the supplied fix."
                                     ]
                                 , under = "Data.On.some"
                                 }
@@ -923,10 +925,10 @@ use = Data.On.some
                           )
                         , ( "Data.On"
                           , [ Review.Test.error
-                                { message = "variant lens on `Data.Some` missing"
+                                { message = "variant helper on `Data.Some` missing"
                                 , details =
-                                    [ "A variant lens with this name is used in other `module`s."
-                                    , "Add the generated lens declaration through the fix."
+                                    [ "A variant helper with this name is used in other `module`s."
+                                    , "Add the generated helper declaration through the fix."
                                     ]
                                 , under = "exposing (..)"
                                 }
@@ -936,7 +938,8 @@ use = Data.On.some
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
-{-| Accessor lens for the variant `Data.Some` of the `type Data`.
+
+{-| Accessor prism for the variant `Data.Some` of the `type Data`.
 
 -}
 some :
@@ -989,21 +992,22 @@ type Data
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantLens.GenerateUsed.rule
+                        (VariantHelper.GenerateUsed.rule
                             { build =
-                                VariantLens.GenerateUsed.accessors
-                                    { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                            , name = VariantLens.GenerateUsed.prismNameVariant
+                                VariantHelper.GenerateUsed.accessors
+                                    { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
                         )
                     |> Review.Test.expectErrorsForModules
                         [ ( "Data.On"
                           , [ Review.Test.error
-                                { message = "variant lens on `Data.Some` missing"
+                                { message = "variant helper on `Data.Some` missing"
                                 , details =
-                                    [ "A variant lens with this name is used in other `module`s."
-                                    , "Add the generated lens declaration through the fix."
+                                    [ "A variant helper with this name is used in other `module`s."
+                                    , "Add the generated helper declaration through the fix."
                                     ]
                                 , under = "exposing (none)"
                                 }
@@ -1013,7 +1017,8 @@ type Data
 import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
 import Data exposing (Data(..))
 
-{-| Accessor lens for the variant `Data.Some` of the `type Data`.
+
+{-| Accessor prism for the variant `Data.Some` of the `type Data`.
 
 -}
 some : Relation String reachable wrap -> Relation Data reachable (Maybe wrap)
@@ -1042,6 +1047,61 @@ none = none
                           )
                         ]
             )
+        , test
+            "variant helper missing in internal module"
+            (\() ->
+                [ """module Data exposing (One)
+
+type One
+    = One String
+
+use = onOne
+"""
+                ]
+                    |> Review.Test.runOnModules
+                        (VariantHelper.GenerateUsed.rule
+                            { build =
+                                VariantHelper.GenerateUsed.accessors
+                                    { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleExternal = VariantHelper.GenerateUsed.variant
+                            , generationModuleIsVariantModuleDotSuffix = "On"
+                            }
+                        )
+                    |> Review.Test.expectErrorsForModules
+                        [ ( "Data"
+                          , [ Review.Test.error
+                                { message = "variant helper on `One` missing"
+                                , details =
+                                    [ "Add the generated helper declaration through the fix."
+                                    ]
+                                , under = "onOne"
+                                }
+                                |> Review.Test.whenFixed
+                                    """module Data exposing (One)
+
+import Accessors exposing (Lens, Relation, makeOneToN_, makeOneToOne_)
+
+type One
+    = One String
+
+
+{-| Accessor lens for the variant `Data.One` of the `type One`.
+
+-}
+onOne : Lens One transformed String wrap
+onOne =
+    makeOneToOne_
+        "Data.One"
+        (\\(One value0) -> value0)
+        (\\valuesAlter (One value0) -> value0 |> valuesAlter |> One)
+
+use = onOne
+"""
+                            ]
+                          )
+                        ]
+            )
         ]
 
 
@@ -1050,7 +1110,7 @@ accepted =
     Test.describe
         "accepted"
         [ test
-            "variant lens already available"
+            "variant helper already available in external module"
             (\() ->
                 [ """module Data exposing (One(..))
 
@@ -1070,11 +1130,38 @@ use = Data.On.one
 """
                 ]
                     |> Review.Test.runOnModules
-                        (VariantLens.GenerateUsed.rule
+                        (VariantHelper.GenerateUsed.rule
                             { build =
-                                VariantLens.GenerateUsed.accessors
-                                    { valuesRepresent = VariantLens.GenerateUsed.tupleNest }
-                            , name = VariantLens.GenerateUsed.prismNameVariant
+                                VariantHelper.GenerateUsed.accessors
+                                    { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleExternal = VariantHelper.GenerateUsed.variant
+                            , generationModuleIsVariantModuleDotSuffix = "On"
+                            }
+                        )
+                    |> Review.Test.expectNoErrors
+            )
+        , test
+            "variant helper already available in internal module"
+            (\() ->
+                [ """module Data exposing (One)
+
+type One
+    = One String
+
+use = onOne
+
+
+onOne = oneOne
+"""
+                ]
+                    |> Review.Test.runOnModules
+                        (VariantHelper.GenerateUsed.rule
+                            { build =
+                                VariantHelper.GenerateUsed.accessors
+                                    { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
                         )

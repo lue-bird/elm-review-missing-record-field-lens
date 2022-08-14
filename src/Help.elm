@@ -1,4 +1,4 @@
-module Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, declarationToVariantType, importsToString, indexed, metaToVariantType, onColumn, qualifiedSyntaxToString, typeLens, typeRelation)
+module Help exposing (beforeSuffixParser, char0ToLower, char0ToUpper, declarationToString, importsToString, indexed, metaToVariantType, onColumn, qualifiedSyntaxToString, typeLens, typeRelation)
 
 import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
@@ -170,40 +170,6 @@ qualifiedToSyntax =
 
             name :: qualificationReverse ->
                 ( qualificationReverse |> List.reverse, name )
-
-
-declarationToVariantType :
-    Declaration
-    ->
-        Maybe
-            ( String
-            , { variants :
-                    Dict String (List CodeGen.TypeAnnotation)
-              , parameters : List String
-              }
-            )
-declarationToVariantType =
-    \declaration ->
-        case declaration of
-            Declaration.CustomTypeDeclaration type_ ->
-                ( type_.name |> Node.value
-                , { parameters =
-                        type_.generics |> List.map Node.value
-                  , variants =
-                        type_.constructors
-                            |> List.map
-                                (\(Node _ variant) ->
-                                    ( variant.name |> Node.value
-                                    , variant.arguments |> List.map Node.value
-                                    )
-                                )
-                            |> Dict.fromList
-                  }
-                )
-                    |> Just
-
-            _ ->
-                Nothing
 
 
 typeRelation :

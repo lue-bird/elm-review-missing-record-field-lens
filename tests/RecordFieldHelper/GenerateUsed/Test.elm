@@ -1,15 +1,15 @@
-module NoMissingRecordFieldLens.Test exposing (all)
+module RecordFieldHelper.GenerateUsed.Test exposing (all)
 
 import Expect
-import NoMissingRecordFieldLens exposing (accessors, accessorsBChiquet, fields, monocle, rule, zipper)
-import NoMissingRecordFieldLens.Internal exposing (nonExistentFieldLensNameInfo, printFieldLensDeclaration)
+import RecordFieldHelper.GenerateUsed exposing (accessors, accessorsBChiquet, fields, monocle, rule, zipper)
+import RecordFieldHelper.GenerateUsed.Internal exposing (nonExistentFieldLensNameInfo, printFieldLensDeclaration)
 import Review.Test
 import Test exposing (Test, describe, test)
 
 
 all : Test
 all =
-    describe "NoMissingRecordFieldLens"
+    describe "RecordFieldHelper.GenerateUsed"
         [ fail, success, declarations ]
 
 

@@ -12,13 +12,13 @@ when inside the directory containing this file.
 -}
 
 import Review.Rule as Rule exposing (Rule)
-import NoMissingRecordFieldLens
+import RecordFieldHelper.GenerateUsed
 
 
 config : List Rule
 config =
-    [ NoMissingRecordFieldLens.rule
-        { generator = NoMissingRecordFieldLens.accessors
+    [ RecordFieldHelper.GenerateUsed.rule
+        { generator = RecordFieldHelper.GenerateUsed.accessors
         , generateIn = ( "Field", [] )
         }
     ]

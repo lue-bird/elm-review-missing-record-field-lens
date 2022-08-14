@@ -1,11 +1,20 @@
-## 2.0.0 plans
-
-- variant lens name → prism
-    - including `module VariantLens.GenerateUsed` name → `VariantPrism.GenerateUsed`
-- `module`-internal prism generation support
-    - name configuration add
-
 # changelog
+
+## 2.0.0
+
+(mostly suggested by [@erlandsona](https://github.com/erlandsona))
+
+- `module VariantLens.GenerateUsed` name → `VariantHelper.GenerateUsed`
+    - documentation lens → helper
+    - including
+    - `module`-internal helper generation support
+    - `ValuesRepresent` name → `ValuesCombined`
+    - accessor argument `{ valuesRepresent }` name → `valuesCombined`
+    - `tupleNest` name → `valuesTupleNest`
+        - to be consistent with `valuesRecord`
+    - `prismNameVariant` → `variant`
+    - `prismNameOnVariant` → `onVariant`
+- `module NoMissingRecordFieldLens` name → `RecordFieldHelper.GenerateUsed`
 
 ### 1.1.0
 

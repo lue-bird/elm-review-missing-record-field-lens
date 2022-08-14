@@ -1,16 +1,16 @@
-module VariantLens.GenerateUsed.Testable exposing (prismDeclarationToCodeGen)
+module VariantHelper.GenerateUsed.Testable exposing (helperDeclarationToCodeGen)
 
 import Elm.CodeGen as CodeGen
 
 
-prismDeclarationToCodeGen :
+helperDeclarationToCodeGen :
     { name : String
     , documentation : Maybe (CodeGen.Comment CodeGen.DocComment)
     , annotation : Maybe CodeGen.TypeAnnotation
     , implementation : CodeGen.Expression
     }
     -> CodeGen.Declaration
-prismDeclarationToCodeGen =
+helperDeclarationToCodeGen =
     \prismDeclaration ->
         CodeGen.funDecl
             prismDeclaration.documentation

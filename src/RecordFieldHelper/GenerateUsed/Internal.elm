@@ -1,4 +1,4 @@
-module NoMissingRecordFieldLens.Internal exposing (nonExistentFieldLensNameInfo, printFieldLensDeclaration, rule)
+module RecordFieldHelper.GenerateUsed.Internal exposing (nonExistentFieldLensNameInfo, printFieldLensDeclaration, rule)
 
 import Dict exposing (Dict)
 import Elm.CodeGen as CodeGen
@@ -178,7 +178,7 @@ rule config =
                                         )
                     )
     in
-    Rule.newProjectRuleSchema "NoMissingRecordFieldLens"
+    Rule.newProjectRuleSchema "RecordFieldHelper.GenerateUsed"
         initialProjectContext
         |> Rule.withModuleVisitor
             (\moduleVisitor ->
@@ -393,7 +393,7 @@ type alias Config =
     }
 
 
-{-| How to generate a [`FieldLensDeclaration`](NoMissingRecordFieldLens#FieldLensDeclaration) plus the necessary imports.
+{-| How to generate a [`FieldLensDeclaration`](RecordFieldHelper.GenerateUsed#FieldLensDeclaration) plus the necessary imports.
 -}
 type alias FieldLensGenerator =
     { imports : List CodeGen.Import
