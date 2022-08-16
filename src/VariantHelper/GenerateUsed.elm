@@ -157,7 +157,7 @@ variantHelperNameConfigCorrectCasing =
 -- config
 
 
-type alias Config =
+type alias Configuration =
     RecordWithoutConstructorFunction
         { build : VariantHelperBuild
         , nameInModuleInternal : VariantHelperNameConfig
@@ -1193,7 +1193,7 @@ importsAdd importsAdditional =
 -- implementation
 
 
-ruleImplementation : Config -> Rule
+ruleImplementation : Configuration -> Rule
 ruleImplementation config =
     Rule.newProjectRuleSchema
         "VariantHelper.GenerateUsed"
@@ -1499,7 +1499,7 @@ projectContextsFold context0 context1 =
     }
 
 
-moduleInternalHelpersGenerate : Config -> ModuleContext -> List (Rule.Error {})
+moduleInternalHelpersGenerate : Configuration -> ModuleContext -> List (Rule.Error {})
 moduleInternalHelpersGenerate config =
     \context ->
         let
@@ -1564,7 +1564,7 @@ moduleInternalHelperGenerate :
     , otherVariants : Dict String { valueCount : Int }
     , helperModuleInternalOneUseRange : Range
     , moduleContext : ModuleContext
-    , config : Config
+    , config : Configuration
     }
     -> Rule.Error {}
 moduleInternalHelperGenerate { typeParameters, variantValues, variantName, config, typeName, otherVariants, helperModuleInternalOneUseRange, moduleContext, belowTypeDeclarationRow } =
@@ -1821,7 +1821,7 @@ dependencyModulesVisit modules =
 
 
 generateForProject :
-    { config : Config
+    { config : Configuration
     , context : ProjectContext
     }
     -> List (Rule.Error { useErrorForModule : () })
@@ -1874,7 +1874,7 @@ generateForModule :
             { variants : Dict String (List CodeGen.TypeAnnotation)
             , parameters : List String
             }
-    , config : Config
+    , config : Configuration
     }
     -> List (Rule.Error errorScope_)
 generateForModule { usedVariantOriginModule, variantModuleName, maybeGenerationModule, useModuleBelowImportsRow, config, variantTypes, useModuleKey } =
