@@ -86,7 +86,8 @@ because [`import` aliases can't contain `.`](https://github.com/elm/compiler/iss
     { build =
         VariantHelper.GenerateUsed.accessors
             { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
-    , name = VariantHelper.GenerateUsed.variant
+    , nameInModuleInternal = VariantHelper.GenerateUsed.variant
+    , nameInModuleExternal = VariantHelper.GenerateUsed.onVariant
     , generationModuleIsVariantModuleDotSuffix = "On"
     }
 
@@ -96,9 +97,16 @@ because [`import` aliases can't contain `.`](https://github.com/elm/compiler/iss
     { build =
         VariantHelper.GenerateUsed.accessors
             { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
-    , name = VariantHelper.GenerateUsed.onVariant
+    , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+    , nameInModuleExternal = VariantHelper.GenerateUsed.onVariant
     , generationModuleIsVariantModuleDotSuffix = "X"
     }
+
+---
+
+Variant helpers will be generated below the `type` declaration.
+Consider [`SiriusStarr/elm-review-no-unsorted`](https://dark.elm.dmy.fr/packages/SiriusStarr/elm-review-no-unsorted/latest/NoUnsortedTopLevelDeclarations)
+for more fine-grained and consistent positioning control
 
 
 ## use it
@@ -788,7 +796,8 @@ which with
     { build =
         VariantHelper.GenerateUsed.accessorsBChiquet
             { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-    , name = VariantHelper.GenerateUsed.variant
+    , nameInModuleInternal = VariantHelper.GenerateUsed.variant
+    , nameInModuleExternal = VariantHelper.GenerateUsed.onVariant
     , generationModuleIsVariantModuleDotSuffix = "On"
     }
 
