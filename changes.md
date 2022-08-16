@@ -1,5 +1,10 @@
 # changelog
 
+#### 2.0.2
+
+- configuration examples correct
+- helper positioning documentation add
+
 #### 2.0.1
 
 - documentation corrections
