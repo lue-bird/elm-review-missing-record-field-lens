@@ -11,16 +11,17 @@ when inside the directory containing this file.
 
 -}
 
+import Dict
 import Review.Rule as Rule exposing (Rule)
-import VariantHelper.GenerateUsed exposing (VariantHelperNameConfig)
+import VariantHelper.GenerateUsed exposing (VariantHelperNameConfig, VariantHelperBuild, ValuesCombined)
 import Elm.CodeGen as CodeGen
 
 
 config : List Rule
 config =
     [ VariantHelper.GenerateUsed.rule
-        { nameInModuleInternal = variantAfter "to"
-        , nameInModuleExternal = variantAfter "to"
+        { nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "to"
+        , nameInModuleExternal = VariantHelper.GenerateUsed.variantAfter "to"
         , build =
             variantAccessTry
                 { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
@@ -34,7 +35,7 @@ variantAccessTry :
     { valuesCombined : ValuesCombined }
     -> VariantHelperBuild
 variantAccessTry { valuesCombined } =
-    \{ typeName, variantName, variantValues, typeParameters } ->
+    \{ typeName, variantName, variantValues, typeParameters, otherVariants } ->
         let
             generation =
                 if otherVariants |> Dict.isEmpty then
