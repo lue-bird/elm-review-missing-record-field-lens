@@ -179,7 +179,7 @@ config =
         { build =
             VariantHelper.GenerateUsed.accessors
                 { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
-        , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+        , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
         , nameInModuleExternal = VariantHelper.GenerateUsed.variant
         , generationModuleIsVariantModuleDotSuffix = "On"
         }

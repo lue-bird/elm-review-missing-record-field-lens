@@ -6,7 +6,8 @@ module VariantHelper.GenerateUsed exposing
     , variantInMultiple, variantOnly
     , ValuesCombined, valuesTupleNest, valuesRecord
     , variantPattern
-    , VariantHelperNameConfig, onVariant, variant
+    , VariantHelperNameConfig, variantAfter, variant
+    , onVariant
     )
 
 {-| Generate helpers for variant values
@@ -26,7 +27,12 @@ module VariantHelper.GenerateUsed exposing
 
 ## name
 
-@docs VariantHelperNameConfig, onVariant, variant
+@docs VariantHelperNameConfig, variantAfter, variant
+
+
+## deprecated
+
+@docs onVariant
 
 -}
 
@@ -72,7 +78,7 @@ that is called from your code but isn't already defined.
       - [`accessorsBChiquet`](#accessorsBChiquet)
   - `name :`
     a way to handle variant helper names like
-      - [`onVariant`](#onVariant)
+      - [`variantAfter "on"`](#variantAfter)
       - [`variant`](#variant)
   - `generationModuleIsVariantModuleDotSuffix :`
     a `.Suffix` to derive generation `module` names from variant `module` names
@@ -87,7 +93,7 @@ because [`import` aliases can't contain `.`](https://github.com/elm/compiler/iss
         VariantHelper.GenerateUsed.accessors
             { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
     , nameInModuleInternal = VariantHelper.GenerateUsed.variant
-    , nameInModuleExternal = VariantHelper.GenerateUsed.onVariant
+    , nameInModuleExternal = VariantHelper.GenerateUsed.variantAfter "on"
     , generationModuleIsVariantModuleDotSuffix = "On"
     }
 
@@ -97,8 +103,8 @@ because [`import` aliases can't contain `.`](https://github.com/elm/compiler/iss
     { build =
         VariantHelper.GenerateUsed.accessors
             { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
-    , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
-    , nameInModuleExternal = VariantHelper.GenerateUsed.onVariant
+    , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
+    , nameInModuleExternal = VariantHelper.GenerateUsed.variantAfter "on"
     , generationModuleIsVariantModuleDotSuffix = "X"
     }
 
@@ -633,7 +639,7 @@ which with
     { build =
         VariantHelper.GenerateUsed.accessors
             { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-    , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+    , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
     , nameInModuleExternal = VariantHelper.GenerateUsed.variant
     , generationModuleIsVariantModuleDotSuffix = "On"
     }
@@ -797,7 +803,7 @@ which with
         VariantHelper.GenerateUsed.accessorsBChiquet
             { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
     , nameInModuleInternal = VariantHelper.GenerateUsed.variant
-    , nameInModuleExternal = VariantHelper.GenerateUsed.onVariant
+    , nameInModuleExternal = VariantHelper.GenerateUsed.variantAfter "on"
     , generationModuleIsVariantModuleDotSuffix = "On"
     }
 
@@ -935,7 +941,7 @@ accessorsBChiquet { valuesCombined } =
 
 Out of the box, there are
 
-  - [`onVariant`](onVariant)
+  - [`variantAfter`](variantAfter)
   - [`variant`](#variant)
 
 You can also create a custom [`VariantHelperNameConfig`](#VariantHelperNameConfig):
@@ -986,27 +992,33 @@ type alias VariantHelperNameConfig =
         }
 
 
-{-| Handle helper names in the format `on<Variant>`.
+{-| Handle helper names in the format `prefix<Variant>`.
 Check out [`VariantHelperNameConfig`](#VariantHelperNameConfig) for all naming options.
 
     import Parser
     import VariantHelper.GenerateUsed
 
-    "onSuccess"
-        |> Parser.run VariantHelper.GenerateUsed.onVariant.parser
+    "toSuccess"
+        |> Parser.run
+            (VariantHelper.GenerateUsed.variantAfter "to"
+                |> .parser
+            )
     --> { variantName = "Success" }
 
     { variantName = "Success" }
-        |> VariantHelper.GenerateUsed.onVariant.build
-    --> "onSuccess"
+        |> (VariantHelper.GenerateUsed.variantAfter "map"
+                |> .build
+           )
+    --> "mapSuccess"
 
 -}
-onVariant : VariantHelperNameConfig
-onVariant =
-    { build = \{ variantName } -> "on" ++ variantName
+variantAfter : String -> VariantHelperNameConfig
+variantAfter prefixBeforeVariantName =
+    { build =
+        \{ variantName } -> prefixBeforeVariantName ++ variantName
     , parser =
         Parser.succeed (\variantName -> { variantName = variantName })
-            |. Parser.token "on"
+            |. Parser.token prefixBeforeVariantName
             |= (Parser.chompWhile (\_ -> True)
                     |> Parser.getChompedString
                )
@@ -2028,3 +2040,21 @@ generateForModule { usedVariantOriginModule, variantModuleName, maybeGenerationM
                     )
             ]
                 |> List.concat
+
+
+
+-- deprecated
+
+
+{-|
+
+> @deprecated in favor of [`variantAfter "on"`](#variantAfter)
+
+Handle helper names in the format `on<Variant>`.
+
+Check out [`VariantHelperNameConfig`](#VariantHelperNameConfig) for all naming options
+
+-}
+onVariant : VariantHelperNameConfig
+onVariant =
+    variantAfter "on"

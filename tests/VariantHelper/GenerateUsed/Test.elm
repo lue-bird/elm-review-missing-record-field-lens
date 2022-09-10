@@ -63,7 +63,7 @@ type One
                                 { build =
                                     VariantHelper.GenerateUsed.accessors
                                         { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
-                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                                 , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
@@ -122,7 +122,7 @@ type Three a
                                 { build =
                                     VariantHelper.GenerateUsed.accessors
                                         { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
-                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                                 , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
@@ -191,7 +191,7 @@ type Data
                                 { build =
                                     VariantHelper.GenerateUsed.accessors
                                         { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
-                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                                 , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
@@ -258,7 +258,7 @@ type Data
                                 { build =
                                     VariantHelper.GenerateUsed.accessors
                                         { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
-                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                                 , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
@@ -332,7 +332,7 @@ use =
                                 { build =
                                     VariantHelper.GenerateUsed.accessors
                                         { valuesCombined = VariantHelper.GenerateUsed.valuesRecord }
-                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                                 , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
@@ -424,7 +424,7 @@ type One
                                 { build =
                                     VariantHelper.GenerateUsed.accessors
                                         { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                                 , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
@@ -483,7 +483,7 @@ type Three a
                                 { build =
                                     VariantHelper.GenerateUsed.accessors
                                         { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                                 , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
@@ -552,7 +552,7 @@ type Data
                                 { build =
                                     VariantHelper.GenerateUsed.accessors
                                         { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                                 , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
@@ -619,7 +619,7 @@ type Data
                                 { build =
                                     VariantHelper.GenerateUsed.accessors
                                         { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                                 , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
@@ -693,7 +693,7 @@ use =
                                 { build =
                                     VariantHelper.GenerateUsed.accessors
                                         { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                                , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                                , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                                 , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                                 , generationModuleIsVariantModuleDotSuffix = "On"
                                 }
@@ -778,7 +778,7 @@ use =
                         { build =
                             VariantHelper.GenerateUsed.accessorsBChiquet
                                 { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                        , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                        , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                         , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                         , generationModuleIsVariantModuleDotSuffix = "On"
                         }
@@ -859,7 +859,7 @@ use = Data.On.one
                             { build =
                                 VariantHelper.GenerateUsed.accessors
                                     { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                             , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
@@ -900,7 +900,7 @@ type Data a b c d
                             { build =
                                 VariantHelper.GenerateUsed.accessors
                                     { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                             , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
@@ -996,7 +996,7 @@ type Data
                             { build =
                                 VariantHelper.GenerateUsed.accessors
                                     { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                             , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
@@ -1063,7 +1063,7 @@ use = onOne
                             { build =
                                 VariantHelper.GenerateUsed.accessors
                                     { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                             , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
@@ -1134,7 +1134,7 @@ use = Data.On.one
                             { build =
                                 VariantHelper.GenerateUsed.accessors
                                     { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                             , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
@@ -1160,7 +1160,7 @@ onOne = oneOne
                             { build =
                                 VariantHelper.GenerateUsed.accessors
                                     { valuesCombined = VariantHelper.GenerateUsed.valuesTupleNest }
-                            , nameInModuleInternal = VariantHelper.GenerateUsed.onVariant
+                            , nameInModuleInternal = VariantHelper.GenerateUsed.variantAfter "on"
                             , nameInModuleExternal = VariantHelper.GenerateUsed.variant
                             , generationModuleIsVariantModuleDotSuffix = "On"
                             }
