@@ -9,6 +9,7 @@
 ### 2.1.0
 
 - `VariantHelper.GenerateUsed.variantAfter` add
+- example "variant-helpers-simple" add
 - configuration examples correct
 - helper positioning documentation add
 
